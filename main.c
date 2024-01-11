@@ -1,4 +1,8 @@
+#define _DEFAULT_SOURCE
+
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
@@ -7,7 +11,8 @@ struct posting {
 	int month;
 	int day;
 	char *desc;
-	char *account;
+	struct posting_line *lines;
+	size_t nlines;
 };
 
 struct posting_line {
@@ -15,6 +20,22 @@ struct posting_line {
 	int val;
 	char *currency;
 };
+
+ssize_t eat_whitespace(char *buf, size_t len, size_t min, bool sameline) {
+	size_t startlen = len;
+	while (len && isspace(*buf)) {
+		if (sameline && *buf == '\n')
+			return startlen - len;
+
+		buf++;
+		len--;
+	}
+
+	if (startlen - len < min)
+		return -1;
+
+	return startlen - len;
+}
 
 ssize_t
 parse_posting_line(char *buf, size_t len, struct posting_line *pl)
@@ -45,13 +66,9 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		return olen - len + 1;
 	}
 
-	if (!isspace(*buf) || *buf == '\n')
-		return -1;
-
-	do {
-		buf++;
-		len--;
-	} while (len && (isspace(*buf) && *buf != '\n'));
+	ssize_t ret = eat_whitespace(buf, len, 1, true);
+	buf += ret;
+	len -= ret;
 
 	if (len == 0)
 		return -1;
@@ -64,10 +81,9 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		len--;
 	}
 
-	while (len && (isspace(*buf) && *buf != '\n')) {
-		buf++;
-		len--;
-	}
+	ret = eat_whitespace(buf, len, 0, true);
+	buf += ret;
+	len -= ret;
 
 	char *currency = buf;
 	size_t currency_len = 0;
@@ -77,14 +93,9 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		len--;
 	}
 
-	while (len && isspace(*buf)) {
-		if (*buf == '\n')
-			break;
+	ret = eat_whitespace(buf, len, 0, true);
 
-		buf++;
-		len--;
-	}
-
+	// account for newline
 	buf++;
 	len--;
 
@@ -98,6 +109,87 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	return olen - len;
 }
 
+ssize_t parse_num(char *buf, size_t len, size_t max, int *out) {
+	size_t startlen = len;
+	while (max && len && isdigit(*buf)) {
+		*out = *out * 10 + *buf - '0';
+		buf++;
+		len--;
+		max--;
+	}
+
+	return startlen - len;
+}
+
+ssize_t parse_posting(char *buf, size_t len, struct posting *p) {
+	int year = 0;
+	size_t startlen = len;
+
+	ssize_t ret = parse_num(buf, len, 4, &year);
+	buf += ret;
+	len -= ret;
+
+	if (*buf != '-') return -1;
+	buf++;
+	len--;
+
+	int month = 0;
+	ret = parse_num(buf, len, 2, &month);
+	buf += ret;
+	len -= ret;
+
+
+	if (*buf != '-') return -1;
+	buf++;
+	len--;
+
+	int day = 0;
+	ret = parse_num(buf, len, 2, &day);
+	buf += ret;
+	len -= ret;
+	
+	// TODO: verify that these are valid dates
+	
+	ret = eat_whitespace(buf, len, 0, true);
+	if (ret == -1)
+		return -1;
+
+	buf += ret;
+	len -= ret;
+
+	char *nl = memchr(buf, '\n', len);
+	p->desc = strndup(buf, nl - buf);
+
+	len -= nl - buf + 1;
+	buf = nl + 1;
+
+	struct posting_line pl = {0};
+	while (len && *buf == '\t') {
+		pl = (struct posting_line){0};
+		ssize_t used = parse_posting_line(buf, len, &pl);
+		if (used == -1)
+			return 1;
+
+		buf += used;
+		len -= used;
+
+		struct posting_line *newlines = reallocarray(p->lines, p->nlines + 1, sizeof(struct posting_line));
+		if (newlines == NULL)
+			return -1;
+
+		memcpy(&newlines[p->nlines], &pl, sizeof(pl));
+		p->nlines++;
+	}
+
+	p->year = year;
+	p->month = month;
+	p->day = day;
+
+	printf("%s %d\n", p->desc, p->nlines);
+
+	return startlen - len;
+}
+
 int main() {
 	char buf[1024];
 	struct posting posting = {0};
@@ -105,85 +197,17 @@ int main() {
 
 	char *ptr = buf;
 
-	int year = 0;
-	while (ptr - buf < count && isdigit(*ptr)) {
-		year = year * 10 + *ptr - '0';
-		ptr++;
-	}
+	while (count) {
+		ssize_t read = eat_whitespace(ptr, count, 0, false);
+		ptr += read;
+		count -= read;
 
-	if (ptr - buf >= count)
-		return 1;
+		posting = (struct posting){0};
+		read = parse_posting(ptr, count, &posting);
+		if (read == -1)
+			break;
 
-	if (*ptr != '-') {
-		return 1;
-	}
-
-	ptr++;
-
-	posting.year = year;
-
-	int month = 0;
-	int mlen = 0;
-	while (ptr - buf < count && isdigit(*ptr) && mlen <= 2) {
-		month = month * 10 + *ptr - '0';
-		mlen++;
-		ptr++;
-	}
-
-	if (month <= 0 || month > 12)
-		return 1;
-
-	if (ptr - buf >= count)
-		return 1;
-
-	if (*ptr != '-') {
-		return 1;
-	}
-
-	ptr++;
-
-	posting.month = month;
-
-	int day = 0;
-	int dlen = 0;
-	while (ptr - buf < count && isdigit(*ptr) && dlen <= 2) {
-		day = day * 10 + *ptr - '0';
-		dlen++;
-		ptr++;
-	}
-
-	// TODO: base off of days in month
-	if (day <= 0 || day > 31)
-		return 1;
-
-	if (ptr - buf < count && *ptr != ' ') {
-		return 1;
-	}
-
-	ptr++;
-
-	posting.day = day;
-
-	if (ptr - buf >= count)
-		return 1;
-
-	char *nl = memchr(ptr, '\n', count - (ptr - buf));
-	posting.desc = strndup(ptr, nl - ptr);
-
-	struct posting_line pl = {0};
-	ptr = nl + 1;
-	size_t len = count - (nl + 1 - buf);
-
-	fprintf(stderr, "%d-%d-%d %s\n", year, month, day, posting.desc);
-	while (len && *ptr == '\t') {
-		ssize_t used = parse_posting_line(ptr, len, &pl);
-		if (used == -1) {
-			fprintf(stderr, "%d\n", used);
-			return 1;
-		}
-
-		ptr += used;
-		len -= used;
-		fprintf(stderr, "%s %d %s\n", pl.account, pl.val, pl.currency);
+		ptr += read;
+		count -= read;
 	}
 }

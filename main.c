@@ -1,15 +1,15 @@
 #define _DEFAULT_SOURCE
+#define _XOPEN_SOURCE
 
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
+#include <time.h>
 
 struct posting {
-	int year;
-	int month;
-	int day;
+	struct tm time;
 	char *desc;
 	struct posting_line *lines;
 	size_t nlines;
@@ -122,35 +122,19 @@ ssize_t parse_num(char *buf, size_t len, size_t max, int *out) {
 }
 
 ssize_t parse_posting(char *buf, size_t len, struct posting *p) {
-	int year = 0;
 	size_t startlen = len;
 
-	ssize_t ret = parse_num(buf, len, 4, &year);
-	buf += ret;
-	len -= ret;
+	if (len < strlen("0000-00-00"))
+		return -1;
 
-	if (*buf != '-') return -1;
-	buf++;
-	len--;
+	char *dateend = strptime(buf, "%Y-%m-%d", &p->time);
+	if (dateend == NULL)
+		return -1;
 
-	int month = 0;
-	ret = parse_num(buf, len, 2, &month);
-	buf += ret;
-	len -= ret;
+	len -= dateend - buf;
+	buf = dateend;
 
-
-	if (*buf != '-') return -1;
-	buf++;
-	len--;
-
-	int day = 0;
-	ret = parse_num(buf, len, 2, &day);
-	buf += ret;
-	len -= ret;
-	
-	// TODO: verify that these are valid dates
-	
-	ret = eat_whitespace(buf, len, 0, true);
+	int ret = eat_whitespace(buf, len, 0, true);
 	if (ret == -1)
 		return -1;
 
@@ -184,11 +168,7 @@ ssize_t parse_posting(char *buf, size_t len, struct posting *p) {
 		p->nlines++;
 	}
 
-	p->year = year;
-	p->month = month;
-	p->day = day;
-
-	printf("%s %d\n", p->desc, p->nlines);
+	printf("%s %d %d-%d-%d\n", p->desc, p->nlines, p->time.tm_year, p->time.tm_mon, p->time.tm_mday);
 
 	return startlen - len;
 }

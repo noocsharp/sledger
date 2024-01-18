@@ -158,6 +158,9 @@ ssize_t parse_posting(char *buf, size_t len, struct posting *p) {
 	len -= ret;
 
 	char *nl = memchr(buf, '\n', len);
+	if (nl == NULL)
+		return -1;
+
 	p->desc = strndup(buf, nl - buf);
 
 	len -= nl - buf + 1;
@@ -190,6 +193,21 @@ ssize_t parse_posting(char *buf, size_t len, struct posting *p) {
 	return startlen - len;
 }
 
+ssize_t find_posting_end(char *buf, size_t count) {
+	char *nl = memchr(buf, '\n', count);
+	size_t ocount = count;
+	while (nl - buf < count) {
+		count = count - (nl - buf + 1);
+		buf = nl + 1;
+		if (count && nl[1] == '\n')
+			return ocount - count;
+
+		nl = memchr(buf, '\n', count);
+	}
+
+	return -1;
+}
+
 int main() {
 	char buf[1024];
 	struct posting posting = {0};
@@ -203,11 +221,28 @@ int main() {
 		count -= read;
 
 		posting = (struct posting){0};
-		read = parse_posting(ptr, count, &posting);
-		if (read == -1)
+		ssize_t out = find_posting_end(ptr, count);
+
+		read = parse_posting(ptr, out == -1 ? count : out, &posting);
+		if (read == -1 && out != -1)
 			break;
 
-		ptr += read;
-		count -= read;
+		if (out == -1) {
+			if (feof(stdin))
+				break;
+
+			memmove(buf, ptr, count);
+			ptr = buf + count;
+			read = fread(ptr, sizeof(char), sizeof(buf) - count, stdin);
+			if (ferror(stdin))
+				return 1;
+
+			count += read;
+			ptr = buf;
+			continue;
+		}
+
+		ptr += out;
+		count -= out;
 	}
 }

@@ -1,6 +1,7 @@
 #define _DEFAULT_SOURCE
 #define _XOPEN_SOURCE
 
+#include <assert.h>
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -15,9 +16,15 @@ struct posting {
 	size_t nlines;
 };
 
+struct decimal {
+	long sig;
+	unsigned int places;
+};
+
 struct posting_line {
 	char *account;
-	int val;
+	bool has_value;
+	struct decimal val;
 	char *currency;
 };
 
@@ -60,9 +67,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	if (*buf == '\n') {
 		pl->account = strndup(account, account_len);
-		// TODO signal that value is not valid
-		pl->val = 0;
-		pl->currency = NULL;
+		pl->has_value = true;
 		return olen - len + 1;
 	}
 
@@ -73,17 +78,45 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	if (len == 0)
 		return -1;
 
-	int val = 0;
-
-	while (len && isdigit(*buf)) {
-		val = 10 * val + *buf - '0';
+	struct decimal val = {0};
+	bool neg = false;
+	if (*buf == '-') {
+		neg = true;
 		buf++;
 		len--;
 	}
 
+	// parse monetary value
+	bool have_point = false;
+	while (len && (isdigit(*buf) || *buf == '.')) {
+		if (*buf == '.') {
+			if (have_point)
+				break;
+
+			have_point = true;
+			buf++;
+			len--;
+			continue;
+		}
+
+		if (have_point)
+			val.places++;
+
+		// TODO: check for overflow
+		val.sig = 10 * val.sig + *buf - '0';
+		buf++;
+		len--;
+	}
+
+	if (neg) val.sig = -val.sig;
+
+	printf("sig: %ld\n", val.sig);
+
 	ret = eat_whitespace(buf, len, 0, true);
 	buf += ret;
 	len -= ret;
+
+	// TODO: handle non-ascii values
 
 	char *currency = buf;
 	size_t currency_len = 0;
@@ -92,6 +125,8 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		buf++;
 		len--;
 	}
+
+	assert(currency_len);
 
 	ret = eat_whitespace(buf, len, 0, true);
 
@@ -165,10 +200,14 @@ ssize_t parse_posting(char *buf, size_t len, struct posting *p) {
 			return -1;
 
 		memcpy(&newlines[p->nlines], &pl, sizeof(pl));
+		p->lines = newlines;
 		p->nlines++;
 	}
 
 	printf("%s %d %d-%d-%d\n", p->desc, p->nlines, p->time.tm_year, p->time.tm_mon, p->time.tm_mday);
+	for (int i = 0; i < p->nlines; i++) {
+		printf("\t%s %d %d %s\n", p->lines[i].account, p->lines[i].val.sig, p->lines[i].val.places, p->lines[i].currency);
+	}
 
 	return startlen - len;
 }

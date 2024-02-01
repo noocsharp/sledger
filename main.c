@@ -9,6 +9,9 @@
 #include <string.h>
 #include <time.h>
 
+#define STB_DS_IMPLEMENTATION
+#include "stb_ds.h"
+
 struct posting {
 	struct tm time;
 	char *desc;
@@ -21,8 +24,14 @@ struct decimal {
 	unsigned int places;
 };
 
+// WARNING: accounts is destroyed and is no longer a valid string hash table
+struct account {
+	char *key;
+	bool value;
+} *accounts = NULL;
+
 struct posting_line {
-	char *account;
+	ptrdiff_t account;
 	bool has_value;
 	struct decimal val;
 	char *currency;
@@ -66,7 +75,14 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	}
 
 	if (*buf == '\n') {
-		pl->account = strndup(account, account_len);
+		char *account_name = strndup(account, account_len);
+		if (account_name == NULL)
+			return -1;
+
+		shput(accounts, account_name, true);
+
+		pl->account = shgeti(accounts, account_name);
+		assert(pl->account);
 		pl->has_value = true;
 		return olen - len + 1;
 	}
@@ -110,8 +126,6 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	if (neg) val.sig = -val.sig;
 
-	printf("sig: %ld\n", val.sig);
-
 	ret = eat_whitespace(buf, len, 0, true);
 	buf += ret;
 	len -= ret;
@@ -134,11 +148,16 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	buf++;
 	len--;
 
-	pl->account = strndup(account, account_len);
+	char *account_name = strndup(account, account_len);
+	if (account_name == NULL)
+		return -1;
+
+	shput(accounts, account_name, true);
+	pl->account = shgeti(accounts, account_name);
 	pl->val = val;
 	pl->currency = strndup(currency, currency_len);
 
-	if (pl->account == NULL || pl->currency == NULL)
+	if (pl->currency == NULL)
 		return -1;
 
 	return olen - len;
@@ -204,11 +223,6 @@ ssize_t parse_posting(char *buf, size_t len, struct posting *p) {
 		p->nlines++;
 	}
 
-	printf("%s %d %d-%d-%d\n", p->desc, p->nlines, p->time.tm_year, p->time.tm_mon, p->time.tm_mday);
-	for (int i = 0; i < p->nlines; i++) {
-		printf("\t%s %d %d %s\n", p->lines[i].account, p->lines[i].val.sig, p->lines[i].val.places, p->lines[i].currency);
-	}
-
 	return startlen - len;
 }
 
@@ -225,6 +239,10 @@ ssize_t find_posting_end(char *buf, size_t count) {
 	}
 
 	return -1;
+}
+
+int strcmp_keys(const void *a, const void *b) {
+	return strcmp(((struct account *)a)->key, ((struct account *)b)->key);
 }
 
 int main() {
@@ -263,5 +281,11 @@ int main() {
 
 		ptr += out;
 		count -= out;
+	}
+
+	// WARNING: accounts is destroyed and is no longer a valid string hash table
+	qsort(accounts, shlenu(accounts), sizeof(struct account), &strcmp_keys);
+	for (size_t i = 0; i < shlenu(accounts); i++) {
+		printf("%s\n", accounts[i].key);
 	}
 }

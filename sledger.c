@@ -142,20 +142,6 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 }
 
 static ssize_t
-parse_num(char *buf, size_t len, size_t max, int *out)
-{
-	size_t startlen = len;
-	while (max && len && isdigit(*buf)) {
-		*out = *out * 10 + *buf - '0';
-		buf++;
-		len--;
-		max--;
-	}
-
-	return startlen - len;
-}
-
-static ssize_t
 parse_posting(char *buf, size_t len, struct posting *p)
 {
 	size_t startlen = len;

@@ -225,18 +225,16 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 		ptr += read;
 		count -= read;
 
+		if (count == 0)
+			break;
+
 		posting = (struct posting){0};
-		// TODO: check out == -1 right after find_posting_end
 		ssize_t out = find_posting_end(ptr, count);
-
-		read = parse_posting(ptr, out == -1 ? count : out, &posting);
-		if (read == -1 && out != -1) {
-			return -1;
-		}
-
 		if (out == -1) {
-			if (feof(stdin))
-				break;
+			// could be the last posting which doesn't end in newlines, so try to parse it anyway
+			if (feof(stdin)) {
+				goto parse_posting;
+			}
 
 			memmove(buf, ptr, count);
 			ptr = buf + count;
@@ -249,10 +247,16 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 			continue;
 		}
 
+parse_posting:
+		read = parse_posting(ptr, out == -1 ? count : out, &posting);
+		if (read == -1 && out != -1) {
+			return -1;
+		}
+
 		processor(&posting, data);
 
-		ptr += out;
-		count -= out;
+		ptr += read;
+		count -= read;
 	}
 
 	return 0;

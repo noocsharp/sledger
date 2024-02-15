@@ -29,10 +29,15 @@ void account_processor(struct posting *posting, void *data) {
 }
 
 int main() {
-	process_postings(account_processor, NULL);
+	if (process_postings(account_processor, NULL) == -1) {
+		fprintf(stderr, "Processing postings failed\n");
+		return 1;
+	}
 	// WARNING: accounts is destroyed and is no longer a valid string hash table
 	qsort(accounts, shlenu(accounts), sizeof(struct account), &strcmp_keys);
 	for (size_t i = 0; i < shlenu(accounts); i++) {
 		printf("%s\n", accounts[i].key);
 	}
+
+	return 0;
 }

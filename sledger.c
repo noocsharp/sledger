@@ -93,7 +93,16 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 			val.places++;
 
 		// TODO: check for overflow
-		val.sig = 10 * val.sig + *buf - '0';
+		long new_sig = 10 * val.sig;
+		if (new_sig / 10 != val.sig) {
+			return -1;
+		}
+
+		new_sig += *buf - '0';
+		if (new_sig < 0)
+			return -1;
+
+		val.sig = new_sig;
 		buf++;
 		len--;
 	}
@@ -182,7 +191,7 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		pl = (struct posting_line){0};
 		ssize_t used = parse_posting_line(buf, len, &pl);
 		if (used == -1)
-			return 1;
+			return -1;
 
 		buf += used;
 		len -= used;
@@ -231,11 +240,13 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 		count -= read;
 
 		posting = (struct posting){0};
+		// TODO: check out == -1 right after find_posting_end
 		ssize_t out = find_posting_end(ptr, count);
 
 		read = parse_posting(ptr, out == -1 ? count : out, &posting);
-		if (read == -1 && out != -1)
-			break;
+		if (read == -1 && out != -1) {
+			return -1;
+		}
 
 		if (out == -1) {
 			if (feof(stdin))
@@ -245,7 +256,7 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 			ptr = buf + count;
 			read = fread(ptr, sizeof(char), sizeof(buf) - count, stdin);
 			if (ferror(stdin))
-				return 1;
+				return -1;
 
 			count += read;
 			ptr = buf;

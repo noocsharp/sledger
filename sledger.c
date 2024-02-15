@@ -1,43 +1,21 @@
-#define _DEFAULT_SOURCE
-#define _XOPEN_SOURCE
+#define _DEFAULT_SOURCE // reallocarray
+#define _XOPEN_SOURCE // strptime
 
 #include <assert.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 #include <time.h>
 
-#define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
+#include "sledger.h"
 
-struct posting {
-	struct tm time;
-	char *desc;
-	struct posting_line *lines;
-	size_t nlines;
-};
-
-struct decimal {
-	long sig;
-	unsigned int places;
-};
-
-// WARNING: accounts is destroyed and is no longer a valid string hash table
-struct account {
-	char *key;
-	bool value;
-} *accounts = NULL;
-
-struct posting_line {
-	ptrdiff_t account;
-	bool has_value;
-	struct decimal val;
-	char *currency;
-};
-
-ssize_t eat_whitespace(char *buf, size_t len, size_t min, bool sameline) {
+static ssize_t
+eat_whitespace(char *buf, size_t len, size_t min, bool sameline)
+{
 	size_t startlen = len;
 	while (len && isspace(*buf)) {
 		if (sameline && *buf == '\n')
@@ -53,7 +31,7 @@ ssize_t eat_whitespace(char *buf, size_t len, size_t min, bool sameline) {
 	return startlen - len;
 }
 
-ssize_t
+static ssize_t
 parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 {
 	size_t olen = len;
@@ -75,14 +53,10 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	}
 
 	if (*buf == '\n') {
-		char *account_name = strndup(account, account_len);
-		if (account_name == NULL)
+		pl->account = strndup(account, account_len);
+		if (pl->account == NULL)
 			return -1;
 
-		shput(accounts, account_name, true);
-
-		pl->account = shgeti(accounts, account_name);
-		assert(pl->account);
 		pl->has_value = true;
 		return olen - len + 1;
 	}
@@ -148,12 +122,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	buf++;
 	len--;
 
-	char *account_name = strndup(account, account_len);
-	if (account_name == NULL)
-		return -1;
-
-	shput(accounts, account_name, true);
-	pl->account = shgeti(accounts, account_name);
+	pl->account = strndup(account, account_len);
 	pl->val = val;
 	pl->currency = strndup(currency, currency_len);
 
@@ -163,7 +132,9 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	return olen - len;
 }
 
-ssize_t parse_num(char *buf, size_t len, size_t max, int *out) {
+static ssize_t
+parse_num(char *buf, size_t len, size_t max, int *out)
+{
 	size_t startlen = len;
 	while (max && len && isdigit(*buf)) {
 		*out = *out * 10 + *buf - '0';
@@ -175,7 +146,9 @@ ssize_t parse_num(char *buf, size_t len, size_t max, int *out) {
 	return startlen - len;
 }
 
-ssize_t parse_posting(char *buf, size_t len, struct posting *p) {
+static ssize_t
+parse_posting(char *buf, size_t len, struct posting *p)
+{
 	size_t startlen = len;
 
 	if (len < strlen("0000-00-00"))
@@ -226,7 +199,9 @@ ssize_t parse_posting(char *buf, size_t len, struct posting *p) {
 	return startlen - len;
 }
 
-ssize_t find_posting_end(char *buf, size_t count) {
+static ssize_t
+find_posting_end(char *buf, size_t count)
+{
 	char *nl = memchr(buf, '\n', count);
 	size_t ocount = count;
 	while (nl - buf < count) {
@@ -241,11 +216,9 @@ ssize_t find_posting_end(char *buf, size_t count) {
 	return -1;
 }
 
-int strcmp_keys(const void *a, const void *b) {
-	return strcmp(((struct account *)a)->key, ((struct account *)b)->key);
-}
-
-int main() {
+int
+process_postings(void (*processor)(struct posting *posting, void *data), void *data)
+{
 	char buf[1024];
 	struct posting posting = {0};
 	size_t count = fread(buf, sizeof(char), sizeof(buf), stdin);
@@ -279,13 +252,11 @@ int main() {
 			continue;
 		}
 
+		processor(&posting, data);
+
 		ptr += out;
 		count -= out;
 	}
 
-	// WARNING: accounts is destroyed and is no longer a valid string hash table
-	qsort(accounts, shlenu(accounts), sizeof(struct account), &strcmp_keys);
-	for (size_t i = 0; i < shlenu(accounts); i++) {
-		printf("%s\n", accounts[i].key);
-	}
+	return 0;
 }

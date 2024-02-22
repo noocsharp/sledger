@@ -13,6 +13,63 @@
 #include "stb_ds.h"
 #include "sledger.h"
 
+int
+decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
+{
+	struct decimal a, b;
+	if (_a->places > _b->places) {
+		b = *_a;
+		a = *_b;
+	} else {
+		a = *_a;
+		b = *_b;
+	}
+
+	while (a.places < b.places) {
+		long new_sig = 10 * a.sig;
+		if (new_sig / 10 != a.sig) {
+			return -1;
+		}
+		a.sig = new_sig;
+		a.places++;
+	}
+
+	// TODO: deal with overflow
+	out->sig = a.sig + b.sig;
+	out->places = b.places;
+
+	return 0;
+}
+
+void
+decimal_print(struct decimal *val)
+{
+	char buf[22];
+	int len = 0;
+
+	long sig = val->sig;
+	unsigned int places = val->places;
+
+	// TODO: print minus properly
+	if (sig < 0) {
+		sig = -sig;
+		putchar('-');
+	}
+
+	while (sig > 0) {
+		buf[len++] = '0' + (sig % 10);
+		places--;
+
+		if (places == 0)
+			buf[len++] = '.';
+		sig /= 10;
+	}
+
+	for (len -= 1; len >= 0; len--) {
+		putchar(buf[len]);
+	}
+}
+
 static ssize_t
 eat_whitespace(char *buf, size_t len, size_t min, bool sameline)
 {
@@ -57,7 +114,6 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		if (pl->account == NULL)
 			return -1;
 
-		pl->has_value = true;
 		return olen - len + 1;
 	}
 
@@ -92,7 +148,6 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		if (have_point)
 			val.places++;
 
-		// TODO: check for overflow
 		long new_sig = 10 * val.sig;
 		if (new_sig / 10 != val.sig) {
 			return -1;
@@ -134,6 +189,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	pl->account = strndup(account, account_len);
 	pl->val = val;
 	pl->currency = strndup(currency, currency_len);
+	pl->has_value = true;
 
 	if (pl->currency == NULL)
 		return -1;
@@ -172,12 +228,28 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	len -= nl - buf + 1;
 	buf = nl + 1;
 
+	int lines_without_values = 0;
+	int line_without_value_index = -1;
+
+	struct decimal total = {0};
+
 	struct posting_line pl = {0};
 	while (len && *buf == '\t') {
 		pl = (struct posting_line){0};
 		ssize_t used = parse_posting_line(buf, len, &pl);
 		if (used == -1)
 			return -1;
+
+		lines_without_values += !pl.has_value;
+		if (lines_without_values > 1)
+			return -1;
+
+		line_without_value_index = p->nlines;
+
+		if (pl.has_value) {
+			decimal_add(&total, &pl.val, &total);
+			total.sig = -total.sig;
+		}
 
 		buf += used;
 		len -= used;
@@ -191,6 +263,8 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		p->nlines++;
 	}
 
+	p->lines[line_without_value_index].val = total;
+	
 	return startlen - len;
 }
 
@@ -249,7 +323,7 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 
 parse_posting:
 		read = parse_posting(ptr, out == -1 ? count : out, &posting);
-		if (read == -1 && out != -1) {
+		if (read == -1) {
 			return -1;
 		}
 

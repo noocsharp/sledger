@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L // strndup
 #define _XOPEN_SOURCE // strptime
 
 #include <assert.h>

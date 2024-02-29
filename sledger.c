@@ -34,7 +34,11 @@ decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
 		a.places++;
 	}
 
-	// TODO: deal with overflow
+	long sum = a.sig + b.sig;
+	if (a.sig < 0 && b.sig < 0 && sum > 0 ||
+	    a.sig > 0 && b.sig > 0 && sum < 0)
+		return -1;
+
 	out->sig = a.sig + b.sig;
 	out->places = b.places;
 

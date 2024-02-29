@@ -228,7 +228,6 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	len -= nl - buf + 1;
 	buf = nl + 1;
 
-	int lines_without_values = 0;
 	int line_without_value_index = -1;
 
 	struct decimal total = {0};
@@ -240,16 +239,15 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		if (used == -1)
 			return -1;
 
-		lines_without_values += !pl.has_value;
-		if (lines_without_values > 1)
-			return -1;
-
-		line_without_value_index = p->nlines;
-
-		if (pl.has_value) {
-			decimal_add(&total, &pl.val, &total);
-			total.sig = -total.sig;
+		if (!pl.has_value) {
+			if (line_without_value_index == -1) {
+				line_without_value_index = p->nlines;
+			} else {
+				return -1;
+			}
 		}
+
+		decimal_add(&total, &pl.val, &total);
 
 		buf += used;
 		len -= used;
@@ -263,6 +261,7 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		p->nlines++;
 	}
 
+	total.sig = -total.sig;
 	p->lines[line_without_value_index].val = total;
 	
 	return startlen - len;

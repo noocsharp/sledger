@@ -23,7 +23,7 @@ int strcmp_keys(const void *a, const void *b) {
 }
 
 void account_processor(struct posting *posting, void *data) {
-	for (int i = 0; i < posting->nlines; i++) {
+	for (int i = 0; i < arrlen(posting->lines); i++) {
 		shput(accounts, posting->lines[i].account, true);
 	}
 }

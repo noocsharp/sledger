@@ -1,4 +1,3 @@
-#define _DEFAULT_SOURCE // reallocarray
 #define _XOPEN_SOURCE // strptime
 
 #include <assert.h>
@@ -50,7 +49,6 @@ decimal_print(struct decimal *val)
 	long sig = val->sig;
 	unsigned int places = val->places;
 
-	// TODO: print minus properly
 	if (sig < 0) {
 		sig = -sig;
 		putchar('-');
@@ -241,7 +239,7 @@ parse_posting(char *buf, size_t len, struct posting *p)
 
 		if (!pl.has_value) {
 			if (line_without_value_index == -1) {
-				line_without_value_index = p->nlines;
+				line_without_value_index = arrlen(p->lines);
 			} else {
 				return -1;
 			}
@@ -252,13 +250,7 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		buf += used;
 		len -= used;
 
-		struct posting_line *newlines = reallocarray(p->lines, p->nlines + 1, sizeof(struct posting_line));
-		if (newlines == NULL)
-			return -1;
-
-		memcpy(&newlines[p->nlines], &pl, sizeof(pl));
-		p->lines = newlines;
-		p->nlines++;
+		arrput(p->lines, pl);
 	}
 
 	total.sig = -total.sig;

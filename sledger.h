@@ -2,7 +2,6 @@ struct posting {
 	struct tm time;
 	char *desc;
 	struct posting_line *lines;
-	size_t nlines;
 };
 
 struct decimal {

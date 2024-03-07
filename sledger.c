@@ -13,6 +13,8 @@
 #include "stb_ds.h"
 #include "sledger.h"
 
+unsigned long line, col;
+
 int
 decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
 {
@@ -73,22 +75,30 @@ decimal_print(struct decimal *val)
 	}
 }
 
-static ssize_t
-eat_whitespace(char *buf, size_t len, size_t min, bool sameline)
+static int
+eat_whitespace(char **buf, size_t *len, size_t min, bool sameline)
 {
-	size_t startlen = len;
-	while (len && isspace(*buf)) {
-		if (sameline && *buf == '\n')
-			return startlen - len;
+	size_t startlen = *len;
+	while (len && isspace(**buf)) {
+		if (sameline && **buf == '\n') {
+			return 0;
+		}
 
-		buf++;
-		len--;
+		if (**buf == '\n') {
+			line++;
+			col = 0;
+		} else {
+			col++;
+		}
+
+		(*buf)++;
+		(*len)--;
 	}
 
-	if (startlen - len < min)
+	if (startlen - *len < min)
 		return -1;
 
-	return startlen - len;
+	return 0;
 }
 
 static ssize_t
@@ -120,9 +130,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		return olen - len + 1;
 	}
 
-	ssize_t ret = eat_whitespace(buf, len, 1, true);
-	buf += ret;
-	len -= ret;
+	eat_whitespace(&buf, &len, 1, true);
 
 	if (len == 0)
 		return -1;
@@ -167,9 +175,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	if (neg) val.sig = -val.sig;
 
-	ret = eat_whitespace(buf, len, 0, true);
-	buf += ret;
-	len -= ret;
+	eat_whitespace(&buf, &len, 0, true);
 
 	// TODO: handle non-ascii values
 
@@ -183,7 +189,8 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	assert(currency_len);
 
-	ret = eat_whitespace(buf, len, 0, true);
+	// TODO: is this necessary?
+	eat_whitespace(&buf, &len, 0, true);
 
 	// account for newline
 	buf++;
@@ -205,8 +212,10 @@ parse_posting(char *buf, size_t len, struct posting *p)
 {
 	size_t startlen = len;
 
-	if (len < strlen("0000-00-00"))
+	if (len < strlen("0000-00-00")) {
+		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
 		return -1;
+	}
 
 	char *dateend = strptime(buf, "%Y-%m-%d", &p->time);
 	if (dateend == NULL)
@@ -215,7 +224,7 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	len -= dateend - buf;
 	buf = dateend;
 
-	int ret = eat_whitespace(buf, len, 0, true);
+	int ret = eat_whitespace(&buf, &len, 0, true);
 	if (ret == -1)
 		return -1;
 
@@ -290,10 +299,9 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 
 	char *ptr = buf;
 
+	ssize_t read;
 	while (count) {
-		ssize_t read = eat_whitespace(ptr, count, 0, false);
-		ptr += read;
-		count -= read;
+		eat_whitespace(&ptr, &count, 0, false);
 
 		if (count == 0)
 			break;

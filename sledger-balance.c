@@ -36,7 +36,6 @@ void account_processor(struct posting *posting, void *data) {
 
 int main() {
 	if (process_postings(account_processor, NULL) == -1) {
-		fprintf(stderr, "Processing postings failed\n");
 		return 1;
 	}
 	// WARNING: accounts is destroyed and is no longer a valid string hash table

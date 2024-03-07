@@ -13,7 +13,7 @@
 #include "stb_ds.h"
 #include "sledger.h"
 
-unsigned long line, col;
+unsigned long line = 1, col = 1;
 
 int
 decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
@@ -75,18 +75,49 @@ decimal_print(struct decimal *val)
 	}
 }
 
+static void
+eat_empty_lines(char **buf, size_t *len)
+{
+	while (1) {
+		char *ptr = *buf;
+		char *next_newline = memchr(*buf, '\n', *len);
+		if (next_newline == NULL) {
+			next_newline = *buf + *len;
+		}
+
+		bool has_content = false;
+		while (ptr < next_newline) {
+			if (!isspace(*ptr)) {
+				has_content = true;
+				break;
+			}
+
+			ptr++;
+		}
+
+		if (has_content)
+			break;
+
+		if (next_newline - *buf < *len) {
+			*len -= next_newline - *buf + 1;
+			*buf = next_newline + 1;
+			line++;
+		}
+	}
+}
+
 static int
 eat_whitespace(char **buf, size_t *len, size_t min, bool sameline)
 {
 	size_t startlen = *len;
-	while (len && isspace(**buf)) {
+	while (*len && isspace(**buf)) {
 		if (sameline && **buf == '\n') {
-			return 0;
+			break;
 		}
 
 		if (**buf == '\n') {
 			line++;
-			col = 0;
+			col = 1;
 		} else {
 			col++;
 		}
@@ -218,27 +249,39 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	}
 
 	char *dateend = strptime(buf, "%Y-%m-%d", &p->time);
-	if (dateend == NULL)
+	if (dateend == NULL) {
+		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
 		return -1;
+	}
 
 	len -= dateend - buf;
+	col += dateend - buf;
 	buf = dateend;
 
-	int ret = eat_whitespace(&buf, &len, 0, true);
-	if (ret == -1)
+
+	int ret = eat_whitespace(&buf, &len, 1, true);
+	if (ret == -1) {
+		fprintf(stderr, "%ld:%ld: expected description for posting\n", line, col);
 		return -1;
+	}
 
 	buf += ret;
 	len -= ret;
+	col += ret;
 
 	char *nl = memchr(buf, '\n', len);
-	if (nl == NULL)
+	// TODO: test this message
+	if (nl == NULL) {
+		fprintf(stderr, "%ld:%ld: expected newline after posting description\n", line, col);
 		return -1;
+	}
 
 	p->desc = strndup(buf, nl - buf);
 
 	len -= nl - buf + 1;
 	buf = nl + 1;
+	line++;
+	col = 1;
 
 	int line_without_value_index = -1;
 
@@ -267,8 +310,14 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		arrput(p->lines, pl);
 	}
 
+	if (arrlen(p->lines) == 0) {
+		fprintf(stderr, "%ld:%ld: expected posting lines after posting description\n", line, col);
+		return -1;
+	}
+
 	total.sig = -total.sig;
-	p->lines[line_without_value_index].val = total;
+	if (line_without_value_index != -1)
+		p->lines[line_without_value_index].val = total;
 	
 	return startlen - len;
 }
@@ -301,7 +350,7 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 
 	ssize_t read;
 	while (count) {
-		eat_whitespace(&ptr, &count, 0, false);
+		eat_empty_lines(&ptr, &count);
 
 		if (count == 0)
 			break;

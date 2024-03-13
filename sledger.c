@@ -13,7 +13,7 @@
 #include "stb_ds.h"
 #include "sledger.h"
 
-unsigned long line = 1, col = 1;
+static unsigned long line = 1, col = 1;
 
 int
 decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
@@ -78,7 +78,7 @@ decimal_print(struct decimal *val)
 static void
 eat_empty_lines(char **buf, size_t *len)
 {
-	while (1) {
+	while (*len) {
 		char *ptr = *buf;
 		char *next_newline = memchr(*buf, '\n', *len);
 		if (next_newline == NULL) {
@@ -133,57 +133,77 @@ eat_whitespace(char **buf, size_t *len, size_t min, bool sameline)
 }
 
 static ssize_t
-parse_posting_line(char *buf, size_t len, struct posting_line *pl)
+parse_posting_line(char **buf, size_t *len, struct posting_line *pl)
 {
-	size_t olen = len;
-	if (len < 1)
+	size_t olen = *len;
+	if (*len < 1)
 		return -1;
 
-	if (*buf != '\t')
+	if (**buf != '\t')
 		return -1;
 
-	buf++;
-	len--;
+	(*buf)++;
+	(*len)--;
+	col++;
 
-	char *account = buf;
+	char *account = *buf;
 	size_t account_len = 0;
-	while (len && (isalpha(*buf) || *buf == ':')) {
+	while (*len && (isalpha(**buf) || **buf == ':')) {
 		account_len++;
-		buf++;
-		len--;
+		(*buf)++;
+		(*len)--;
+		col++;
 	}
 
-	if (*buf == '\n') {
-		pl->account = strndup(account, account_len);
-		if (pl->account == NULL)
-			return -1;
-
-		return olen - len + 1;
+	if (account_len == 0) {
+		fprintf(stderr, "%ld:%ld: expected account name on posting line\n", line, col);
+		return -1;
 	}
 
-	eat_whitespace(&buf, &len, 1, true);
+	pl->account = strndup(account, account_len);
+	if (pl->account == NULL)
+		return -1;
 
-	if (len == 0)
+	if (!isspace(**buf)) {
+		fprintf(stderr, "%ld:%ld: expected whitespace after account name '%s'\n", line, col, pl->account);
+		return -1;
+	}
+
+	eat_whitespace(buf, len, 1, true);
+
+	// the case where the line's value should be inferred
+	if (**buf == '\n') {
+		(*buf)++;
+		(*len)--;
+		line++;
+		col = 1;
+		return olen - *len + 1;
+	}
+
+	pl->has_value = true;
+
+	if (*len == 0)
 		return -1;
 
 	struct decimal val = {0};
 	bool neg = false;
-	if (*buf == '-') {
+	if (**buf == '-') {
 		neg = true;
-		buf++;
-		len--;
+		(*buf)++;
+		(*len)--;
 	}
 
 	// parse monetary value
-	bool have_point = false;
-	while (len && (isdigit(*buf) || *buf == '.')) {
-		if (*buf == '.') {
+	bool have_point = false, present = false;
+	while (*len && (isdigit(**buf) || **buf == '.')) {
+		present = true;
+		if (**buf == '.') {
 			if (have_point)
 				break;
 
 			have_point = true;
-			buf++;
-			len--;
+			(*buf)++;
+			(*len)--;
 			continue;
 		}
 
@@ -195,47 +215,49 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 			return -1;
 		}
 
-		new_sig += *buf - '0';
+		new_sig += **buf - '0';
 		if (new_sig < 0)
 			return -1;
 
 		val.sig = new_sig;
-		buf++;
-		len--;
+		(*buf)++;
+		(*len)--;
+	}
+
+	if (!present) {
+		fprintf(stderr, "%ld:%ld: expected value after account name '%s'\n", line, col, pl->account);
+		return -1;
 	}
 
 	if (neg) val.sig = -val.sig;
 
-	eat_whitespace(&buf, &len, 0, true);
+	pl->val = val;
+
+	eat_whitespace(buf, len, 0, true);
 
 	// TODO: handle non-ascii values
 
-	char *currency = buf;
+	char *currency = *buf;
 	size_t currency_len = 0;
-	while (len && isalpha(*buf)) {
+	while (*len && isalpha(**buf)) {
 		currency_len++;
-		buf++;
-		len--;
+		(*buf)++;
+		(*len)--;
 	}
 
-	assert(currency_len);
-
-	// TODO: is this necessary?
-	eat_whitespace(&buf, &len, 0, true);
-
-	// account for newline
-	buf++;
-	len--;
-
-	pl->account = strndup(account, account_len);
-	pl->val = val;
 	pl->currency = strndup(currency, currency_len);
-	pl->has_value = true;
-
 	if (pl->currency == NULL)
 		return -1;
 
-	return olen - len;
+	eat_whitespace(buf, len, 0, true);
+
+	// account for newline
+	(*buf)++;
+	(*len)--;
+	line++;
+	col = 1;
+
+	return olen - *len;
 }
 
 static ssize_t
@@ -270,8 +292,8 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	col += ret;
 
 	char *nl = memchr(buf, '\n', len);
-	// TODO: test this message
 	if (nl == NULL) {
+		col += len;
 		fprintf(stderr, "%ld:%ld: expected newline after posting description\n", line, col);
 		return -1;
 	}
@@ -290,7 +312,7 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	struct posting_line pl = {0};
 	while (len && *buf == '\t') {
 		pl = (struct posting_line){0};
-		ssize_t used = parse_posting_line(buf, len, &pl);
+		ssize_t used = parse_posting_line(&buf, &len, &pl);
 		if (used == -1)
 			return -1;
 
@@ -298,20 +320,24 @@ parse_posting(char *buf, size_t len, struct posting *p)
 			if (line_without_value_index == -1) {
 				line_without_value_index = arrlen(p->lines);
 			} else {
+				fprintf(stderr, "%ld:%ld: cannot have more than two lines in a posting without values\n", line, col);
 				return -1;
 			}
 		}
 
 		decimal_add(&total, &pl.val, &total);
 
-		buf += used;
-		len -= used;
-
 		arrput(p->lines, pl);
 	}
 
-	if (arrlen(p->lines) == 0) {
-		fprintf(stderr, "%ld:%ld: expected posting lines after posting description\n", line, col);
+	if (arrlen(p->lines) < 2) {
+		fprintf(stderr, "%ld:%ld: expected at least 2 posting lines after posting description\n", line, col);
+		return -1;
+	}
+
+	// TODO: don't require newline on last posting
+	if (*buf != '\n') {
+		fprintf(stderr, "%ld:%ld: expected newline to terminate posting\n", line, col);
 		return -1;
 	}
 
@@ -356,6 +382,7 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 			break;
 
 		posting = (struct posting){0};
+		// TODO: can we remove this and just use feof?
 		ssize_t out = find_posting_end(ptr, count);
 		if (out == -1) {
 			// could be the last posting which doesn't end in newlines, so try to parse it anyway

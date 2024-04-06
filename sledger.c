@@ -107,51 +107,51 @@ eat_empty_lines(char **buf, size_t *len)
 }
 
 static int
-eat_whitespace(char **buf, size_t *len, size_t min, bool sameline)
+eat_whitespace(char *buf, size_t len, size_t min, bool sameline)
 {
-	size_t startlen = *len;
-	while (*len && isspace(**buf)) {
-		if (sameline && **buf == '\n') {
+	size_t startlen = len;
+	while (len && isspace(*buf)) {
+		if (sameline && *buf == '\n') {
 			break;
 		}
 
-		if (**buf == '\n') {
+		if (*buf == '\n') {
 			line++;
 			col = 1;
 		} else {
 			col++;
 		}
 
-		(*buf)++;
-		(*len)--;
+		buf++;
+		len--;
 	}
 
-	if (startlen - *len < min)
+	if (startlen - len < min)
 		return -1;
 
-	return 0;
+	return startlen - len;
 }
 
 static ssize_t
-parse_posting_line(char **buf, size_t *len, struct posting_line *pl)
+parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 {
-	size_t olen = *len;
-	if (*len < 1)
+	size_t olen = len;
+	if (len < 1)
 		return -1;
 
-	if (**buf != '\t')
+	if (*buf != '\t')
 		return -1;
 
-	(*buf)++;
-	(*len)--;
+	buf++;
+	len--;
 	col++;
 
-	char *account = *buf;
+	char *account = buf;
 	size_t account_len = 0;
-	while (*len && (isalpha(**buf) || **buf == ':')) {
+	while (len && (isalpha(*buf) || *buf == ':')) {
 		account_len++;
-		(*buf)++;
-		(*len)--;
+		buf++;
+		len--;
 		col++;
 	}
 
@@ -164,46 +164,50 @@ parse_posting_line(char **buf, size_t *len, struct posting_line *pl)
 	if (pl->account == NULL)
 		return -1;
 
-	if (!isspace(**buf)) {
+	if (!isspace(*buf)) {
 		fprintf(stderr, "%ld:%ld: expected whitespace after account name '%s'\n", line, col, pl->account);
 		return -1;
 	}
 
-	eat_whitespace(buf, len, 1, true);
+	int ret = eat_whitespace(buf, len, 1, true);
+	if (ret != -1) {
+		buf += ret;
+		len -= ret;
+	}
 
 	// the case where the line's value should be inferred
-	if (**buf == '\n') {
-		(*buf)++;
-		(*len)--;
+	if (*buf == '\n') {
+		buf++;
+		len--;
 		line++;
 		col = 1;
-		return olen - *len + 1;
+		return olen - len + 1;
 	}
 
 	pl->has_value = true;
 
-	if (*len == 0)
+	if (len == 0)
 		return -1;
 
 	struct decimal val = {0};
 	bool neg = false;
-	if (**buf == '-') {
+	if (*buf == '-') {
 		neg = true;
-		(*buf)++;
-		(*len)--;
+		buf++;
+		len--;
 	}
 
 	// parse monetary value
 	bool have_point = false, present = false;
-	while (*len && (isdigit(**buf) || **buf == '.')) {
+	while (len && (isdigit(*buf) || *buf == '.')) {
 		present = true;
-		if (**buf == '.') {
+		if (*buf == '.') {
 			if (have_point)
 				break;
 
 			have_point = true;
-			(*buf)++;
-			(*len)--;
+			buf++;
+			len--;
 			continue;
 		}
 
@@ -215,13 +219,13 @@ parse_posting_line(char **buf, size_t *len, struct posting_line *pl)
 			return -1;
 		}
 
-		new_sig += **buf - '0';
+		new_sig += *buf - '0';
 		if (new_sig < 0)
 			return -1;
 
 		val.sig = new_sig;
-		(*buf)++;
-		(*len)--;
+		buf++;
+		len--;
 	}
 
 	if (!present) {
@@ -237,12 +241,12 @@ parse_posting_line(char **buf, size_t *len, struct posting_line *pl)
 
 	// TODO: handle non-ascii values
 
-	char *currency = *buf;
+	char *currency = buf;
 	size_t currency_len = 0;
-	while (*len && isalpha(**buf)) {
+	while (len && isalpha(*buf)) {
 		currency_len++;
-		(*buf)++;
-		(*len)--;
+		buf++;
+		len--;
 	}
 
 	pl->currency = strndup(currency, currency_len);
@@ -252,56 +256,65 @@ parse_posting_line(char **buf, size_t *len, struct posting_line *pl)
 	eat_whitespace(buf, len, 0, true);
 
 	// account for newline
-	(*buf)++;
-	(*len)--;
+	buf++;
+	len--;
 	line++;
 	col = 1;
 
-	return olen - *len;
+	return olen - len;
+}
+
+bool isemptyline(char *lineptr, size_t n) {
+	for (int i = 0; i < n; i++) {
+		if (!isspace(lineptr[i]))
+			return false;
+	}
+
+	return true;
 }
 
 static ssize_t
-parse_posting(char *buf, size_t len, struct posting *p)
+parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 {
-	size_t startlen = len;
+	size_t startlen = *len;
 
-	if (len < strlen("0000-00-00")) {
+	if (*len < strlen("0000-00-00")) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
 		return -1;
 	}
 
-	char *dateend = strptime(buf, "%Y-%m-%d", &p->time);
+	char *dateend = strptime(*buf, "%Y-%m-%d", &p->time);
 	if (dateend == NULL) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
 		return -1;
 	}
 
-	len -= dateend - buf;
-	col += dateend - buf;
-	buf = dateend;
+	*len -= dateend - *buf;
+	col += dateend - *buf;
+	*buf = dateend;
 
-
-	int ret = eat_whitespace(&buf, &len, 1, true);
+	int ret = eat_whitespace(*buf, *len, 1, true);
 	if (ret == -1) {
 		fprintf(stderr, "%ld:%ld: expected description for posting\n", line, col);
 		return -1;
 	}
 
-	buf += ret;
-	len -= ret;
+	*buf += ret;
+	*len -= ret;
 	col += ret;
 
-	char *nl = memchr(buf, '\n', len);
+	char *nl = memchr(*buf, '\n', *len);
+	// TODO: what if this is the last line in the file?
 	if (nl == NULL) {
-		col += len;
+		col += *len;
 		fprintf(stderr, "%ld:%ld: expected newline after posting description\n", line, col);
 		return -1;
 	}
 
-	p->desc = strndup(buf, nl - buf);
+	p->desc = strndup(*buf, nl - *buf);
 
-	len -= nl - buf + 1;
-	buf = nl + 1;
+	*len -= nl - *buf + 1;
+	*buf = nl + 1;
 	line++;
 	col = 1;
 
@@ -310,9 +323,14 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	struct decimal total = {0};
 
 	struct posting_line pl = {0};
-	while (len && *buf == '\t') {
+	ssize_t read;
+
+	while ((read = getline(buf, bufsize, stdin)) != -1) {
+		if (isemptyline(*buf, read))
+			break;
+
 		pl = (struct posting_line){0};
-		ssize_t used = parse_posting_line(&buf, &len, &pl);
+		ssize_t used = parse_posting_line(*buf, read, &pl);
 		if (used == -1)
 			return -1;
 
@@ -335,17 +353,11 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		return -1;
 	}
 
-	// TODO: don't require newline on last posting
-	if (*buf != '\n') {
-		fprintf(stderr, "%ld:%ld: expected newline to terminate posting\n", line, col);
-		return -1;
-	}
-
 	total.sig = -total.sig;
 	if (line_without_value_index != -1)
 		p->lines[line_without_value_index].val = total;
-	
-	return startlen - len;
+
+	return startlen - *len;
 }
 
 static ssize_t
@@ -368,50 +380,30 @@ find_posting_end(char *buf, size_t count)
 int
 process_postings(void (*processor)(struct posting *posting, void *data), void *data)
 {
-	char buf[1024];
 	struct posting posting = {0};
-	size_t count = fread(buf, sizeof(char), sizeof(buf), stdin);
-
-	char *ptr = buf;
+	char *lineptr = NULL;
+	size_t n = 0;
 
 	ssize_t read;
-	while (count) {
-		eat_empty_lines(&ptr, &count);
-
-		if (count == 0)
-			break;
+	while ((read = getline(&lineptr, &n, stdin)) != -1) {
+		if (isemptyline(lineptr, read))
+			continue;
 
 		posting = (struct posting){0};
-		// TODO: can we remove this and just use feof?
-		ssize_t out = find_posting_end(ptr, count);
-		if (out == -1) {
-			// could be the last posting which doesn't end in newlines, so try to parse it anyway
-			if (feof(stdin)) {
-				goto parse_posting;
-			}
 
-			memmove(buf, ptr, count);
-			ptr = buf + count;
-			read = fread(ptr, sizeof(char), sizeof(buf) - count, stdin);
-			if (ferror(stdin))
-				return -1;
-
-			count += read;
-			ptr = buf;
-			continue;
-		}
-
-parse_posting:
-		read = parse_posting(ptr, out == -1 ? count : out, &posting);
-		if (read == -1) {
+		int ret = parse_posting(&lineptr, &n, &read, &posting);
+		if (ret == -1) {
+			fprintf(stderr, "parsing failed\n");
 			return -1;
 		}
 
 		processor(&posting, data);
-
-		ptr += read;
-		count -= read;
 	}
 
-	return 0;
+	if (feof(stdin))
+		return 0;
+
+	perror("process_postings");
+
+	return -1;
 }

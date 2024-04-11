@@ -13,7 +13,7 @@
 #include "stb_ds.h"
 #include "sledger.h"
 
-static unsigned long line = 1, col = 1;
+static unsigned long line = 0, col = 1;
 
 int
 decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
@@ -75,53 +75,16 @@ decimal_print(struct decimal *val)
 	}
 }
 
-static void
-eat_empty_lines(char **buf, size_t *len)
-{
-	while (*len) {
-		char *ptr = *buf;
-		char *next_newline = memchr(*buf, '\n', *len);
-		if (next_newline == NULL) {
-			next_newline = *buf + *len;
-		}
-
-		bool has_content = false;
-		while (ptr < next_newline) {
-			if (!isspace(*ptr)) {
-				has_content = true;
-				break;
-			}
-
-			ptr++;
-		}
-
-		if (has_content)
-			break;
-
-		if (next_newline - *buf < *len) {
-			*len -= next_newline - *buf + 1;
-			*buf = next_newline + 1;
-			line++;
-		}
-	}
-}
-
 static int
-eat_whitespace(char *buf, size_t len, size_t min, bool sameline)
+eat_whitespace(char *buf, size_t len, size_t min)
 {
 	size_t startlen = len;
 	while (len && isspace(*buf)) {
-		if (sameline && *buf == '\n') {
+		if (*buf == '\n') {
 			break;
 		}
 
-		if (*buf == '\n') {
-			line++;
-			col = 1;
-		} else {
-			col++;
-		}
-
+		col++;
 		buf++;
 		len--;
 	}
@@ -132,10 +95,9 @@ eat_whitespace(char *buf, size_t len, size_t min, bool sameline)
 	return startlen - len;
 }
 
-static ssize_t
+static int
 parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 {
-	size_t olen = len;
 	if (len < 1)
 		return -1;
 
@@ -169,7 +131,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		return -1;
 	}
 
-	int ret = eat_whitespace(buf, len, 1, true);
+	int ret = eat_whitespace(buf, len, 1);
 	if (ret != -1) {
 		buf += ret;
 		len -= ret;
@@ -179,9 +141,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	if (*buf == '\n') {
 		buf++;
 		len--;
-		line++;
-		col = 1;
-		return olen - len + 1;
+		return 0;
 	}
 
 	pl->has_value = true;
@@ -195,6 +155,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		neg = true;
 		buf++;
 		len--;
+		col++;
 	}
 
 	// parse monetary value
@@ -208,6 +169,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 			have_point = true;
 			buf++;
 			len--;
+			col++;
 			continue;
 		}
 
@@ -226,6 +188,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		val.sig = new_sig;
 		buf++;
 		len--;
+		col++;
 	}
 
 	if (!present) {
@@ -237,7 +200,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	pl->val = val;
 
-	eat_whitespace(buf, len, 0, true);
+	eat_whitespace(buf, len, 0);
 
 	// TODO: handle non-ascii values
 
@@ -247,21 +210,20 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		currency_len++;
 		buf++;
 		len--;
+		col++;
 	}
 
 	pl->currency = strndup(currency, currency_len);
 	if (pl->currency == NULL)
 		return -1;
 
-	eat_whitespace(buf, len, 0, true);
+	eat_whitespace(buf, len, 0);
 
 	// account for newline
 	buf++;
 	len--;
-	line++;
-	col = 1;
 
-	return olen - len;
+	return 0;
 }
 
 bool isemptyline(char *lineptr, size_t n) {
@@ -273,11 +235,9 @@ bool isemptyline(char *lineptr, size_t n) {
 	return true;
 }
 
-static ssize_t
+static int
 parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 {
-	size_t startlen = *len;
-
 	if (*len < strlen("0000-00-00")) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
 		return -1;
@@ -293,7 +253,7 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 	col += dateend - *buf;
 	*buf = dateend;
 
-	int ret = eat_whitespace(*buf, *len, 1, true);
+	int ret = eat_whitespace(*buf, *len, 1);
 	if (ret == -1) {
 		fprintf(stderr, "%ld:%ld: expected description for posting\n", line, col);
 		return -1;
@@ -304,7 +264,6 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 	col += ret;
 
 	char *nl = memchr(*buf, '\n', *len);
-	// TODO: what if this is the last line in the file?
 	if (nl == NULL) {
 		col += *len;
 		fprintf(stderr, "%ld:%ld: expected newline after posting description\n", line, col);
@@ -315,17 +274,14 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 
 	*len -= nl - *buf + 1;
 	*buf = nl + 1;
-	line++;
-	col = 1;
 
 	int line_without_value_index = -1;
-
 	struct decimal total = {0};
-
 	struct posting_line pl = {0};
 	ssize_t read;
 
 	while ((read = getline(buf, bufsize, stdin)) != -1) {
+		line++; col = 1;
 		if (isemptyline(*buf, read))
 			break;
 
@@ -357,24 +313,7 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 	if (line_without_value_index != -1)
 		p->lines[line_without_value_index].val = total;
 
-	return startlen - *len;
-}
-
-static ssize_t
-find_posting_end(char *buf, size_t count)
-{
-	char *nl = memchr(buf, '\n', count);
-	size_t ocount = count;
-	while (nl - buf < count) {
-		count = count - (nl - buf + 1);
-		buf = nl + 1;
-		if (count && nl[1] == '\n')
-			return ocount - count;
-
-		nl = memchr(buf, '\n', count);
-	}
-
-	return -1;
+	return 0;
 }
 
 int
@@ -386,6 +325,7 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 
 	ssize_t read;
 	while ((read = getline(&lineptr, &n, stdin)) != -1) {
+		line++; col = 1;
 		if (isemptyline(lineptr, read))
 			continue;
 

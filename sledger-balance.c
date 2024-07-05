@@ -26,10 +26,12 @@ void account_processor(struct posting *posting, void *data) {
 	for (int i = 0; i < arrlen(posting->lines); i++) {
 		ptrdiff_t idx = shgeti(accounts, posting->lines[i].account);
 		if (idx == -1) {
-			shput(accounts, posting->lines[i].account, posting->lines[i].val);
+			char *account = strdup(posting->lines[i].account);
+			assert(account);
+			shput(accounts, account, posting->lines[i].val);
 		} else {
 			decimal_add(&accounts[idx].value, &posting->lines[i].val, &val);
-			shput(accounts, posting->lines[i].account, val);
+			shput(accounts, accounts[idx].key, val);
 		}
 	}
 }

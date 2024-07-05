@@ -13,7 +13,8 @@
 #include "stb_ds.h"
 #include "sledger.h"
 
-static unsigned long line = 0, col = 1;
+static unsigned long line, col;
+static int count = 0;
 
 int
 decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
@@ -128,7 +129,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	if (!isspace(*buf)) {
 		fprintf(stderr, "%ld:%ld: expected whitespace after account name '%s'\n", line, col, pl->account);
-		return -1;
+		goto err1;
 	}
 
 	int ret = eat_whitespace(buf, len, 1);
@@ -147,7 +148,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	pl->has_value = true;
 
 	if (len == 0)
-		return -1;
+		goto err1;
 
 	struct decimal val = {0};
 	bool neg = false;
@@ -178,12 +179,12 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 		long new_sig = 10 * val.sig;
 		if (new_sig / 10 != val.sig) {
-			return -1;
+			goto err1;
 		}
 
 		new_sig += *buf - '0';
 		if (new_sig < 0)
-			return -1;
+			goto err1;
 
 		val.sig = new_sig;
 		buf++;
@@ -193,7 +194,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	if (!present) {
 		fprintf(stderr, "%ld:%ld: expected value after account name '%s'\n", line, col, pl->account);
-		return -1;
+		goto err1;
 	}
 
 	if (neg) val.sig = -val.sig;
@@ -215,7 +216,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	pl->currency = strndup(currency, currency_len);
 	if (pl->currency == NULL)
-		return -1;
+		goto err1;
 
 	eat_whitespace(buf, len, 0);
 
@@ -224,6 +225,10 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	len--;
 
 	return 0;
+
+err1:
+	free(pl->account);
+	return -1;
 }
 
 bool isemptyline(char *lineptr, size_t n) {
@@ -238,14 +243,18 @@ bool isemptyline(char *lineptr, size_t n) {
 static int
 parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 {
+	char **lineptr = buf;
+	char *linestart = *buf;
 	if (*len < strlen("0000-00-00")) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
+		goto err0;
 		return -1;
 	}
 
 	char *dateend = strptime(*buf, "%Y-%m-%d", &p->time);
 	if (dateend == NULL) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
+		goto err0;
 		return -1;
 	}
 
@@ -256,6 +265,7 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 	int ret = eat_whitespace(*buf, *len, 1);
 	if (ret == -1) {
 		fprintf(stderr, "%ld:%ld: expected description for posting\n", line, col);
+		goto err0;
 		return -1;
 	}
 
@@ -267,6 +277,7 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 	if (nl == NULL) {
 		col += *len;
 		fprintf(stderr, "%ld:%ld: expected newline after posting description\n", line, col);
+		goto err0;
 		return -1;
 	}
 
@@ -280,22 +291,23 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 	struct posting_line pl = {0};
 	ssize_t read;
 
-	while ((read = getline(buf, bufsize, stdin)) != -1) {
+	*lineptr = linestart;
+	while ((read = getline(lineptr, bufsize, stdin)) != -1) {
 		line++; col = 1;
-		if (isemptyline(*buf, read))
+		if (isemptyline(*lineptr, read))
 			break;
 
 		pl = (struct posting_line){0};
-		ssize_t used = parse_posting_line(*buf, read, &pl);
+		ssize_t used = parse_posting_line(*lineptr, read, &pl);
 		if (used == -1)
-			return -1;
+			goto err1;
 
 		if (!pl.has_value) {
 			if (line_without_value_index == -1) {
 				line_without_value_index = arrlen(p->lines);
 			} else {
 				fprintf(stderr, "%ld:%ld: cannot have more than two lines in a posting without values\n", line, col);
-				return -1;
+				goto err2;
 			}
 		}
 
@@ -304,9 +316,12 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 		arrput(p->lines, pl);
 	}
 
+	if (read == -1)
+		goto err1;
+
 	if (arrlen(p->lines) < 2) {
 		fprintf(stderr, "%ld:%ld: expected at least 2 posting lines after posting description\n", line, col);
-		return -1;
+		goto err1;
 	}
 
 	total.sig = -total.sig;
@@ -314,6 +329,15 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 		p->lines[line_without_value_index].val = total;
 
 	return 0;
+
+err2:
+	free(pl.account);
+	if (pl.currency) free(pl.currency);
+err1:
+	free(p->desc);
+	p->desc = NULL;
+err0:
+	return -1;
 }
 
 int
@@ -322,6 +346,8 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 	struct posting posting = {0};
 	char *lineptr = NULL;
 	size_t n = 0;
+	line = 0;
+	col = 1;
 
 	ssize_t read;
 	while ((read = getline(&lineptr, &n, stdin)) != -1) {
@@ -334,16 +360,38 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 		int ret = parse_posting(&lineptr, &n, &read, &posting);
 		if (ret == -1) {
 			fprintf(stderr, "parsing failed\n");
-			return -1;
+			goto error;
 		}
 
 		processor(&posting, data);
+
+		if (posting.desc)
+			free(posting.desc);
+		for (size_t i = 0; i < arrlen(posting.lines); i++) {
+			if (posting.lines[i].account) free(posting.lines[i].account);
+			if (posting.lines[i].currency) free(posting.lines[i].currency);
+		}
+		arrfree(posting.lines);
+	}
+
+	if (lineptr) {
+		free(lineptr);
+		lineptr = NULL;
 	}
 
 	if (feof(stdin))
 		return 0;
 
-	perror("process_postings");
+error:
 
+	if (posting.desc)
+		free(posting.desc);
+	for (size_t i = 0; i < arrlen(posting.lines); i++) {
+		if (posting.lines[i].account) free(posting.lines[i].account);
+		if (posting.lines[i].currency) free(posting.lines[i].currency);
+	}
+	arrfree(posting.lines);
+	if (lineptr)
+		free(lineptr);
 	return -1;
 }

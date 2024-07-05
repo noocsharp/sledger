@@ -24,7 +24,9 @@ int strcmp_keys(const void *a, const void *b) {
 
 void account_processor(struct posting *posting, void *data) {
 	for (int i = 0; i < arrlen(posting->lines); i++) {
-		shput(accounts, posting->lines[i].account, true);
+		char *account_str = strdup(posting->lines[i].account);
+		assert(account_str);
+		shput(accounts, account_str, true);
 	}
 }
 
@@ -37,7 +39,10 @@ int main() {
 	qsort(accounts, shlenu(accounts), sizeof(struct account), &strcmp_keys);
 	for (size_t i = 0; i < shlenu(accounts); i++) {
 		printf("%s\n", accounts[i].key);
+		free(accounts[i].key);
 	}
+
+	shfree(accounts);
 
 	return 0;
 }

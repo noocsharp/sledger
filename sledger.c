@@ -248,14 +248,12 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 	if (*len < strlen("0000-00-00")) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
 		goto err0;
-		return -1;
 	}
 
 	char *dateend = strptime(*buf, "%Y-%m-%d", &p->time);
 	if (dateend == NULL) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
 		goto err0;
-		return -1;
 	}
 
 	*len -= dateend - *buf;
@@ -266,7 +264,6 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 	if (ret == -1) {
 		fprintf(stderr, "%ld:%ld: expected description for posting\n", line, col);
 		goto err0;
-		return -1;
 	}
 
 	*buf += ret;
@@ -278,7 +275,6 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 		col += *len;
 		fprintf(stderr, "%ld:%ld: expected newline after posting description\n", line, col);
 		goto err0;
-		return -1;
 	}
 
 	p->desc = strndup(*buf, nl - *buf);
@@ -316,8 +312,10 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 		arrput(p->lines, pl);
 	}
 
-	if (read == -1)
+	if (read == -1 && !feof(stdin)) {
+		fprintf(stderr, "%ld:%ld: getline read failed\n", line, col);
 		goto err1;
+	}
 
 	if (arrlen(p->lines) < 2) {
 		fprintf(stderr, "%ld:%ld: expected at least 2 posting lines after posting description\n", line, col);
@@ -394,4 +392,36 @@ error:
 	if (lineptr)
 		free(lineptr);
 	return -1;
+}
+
+void posting_dup(struct posting *dst, const struct posting *src) {
+	dst->time = src->time;
+	dst->desc = strdup(src->desc);
+	if (dst->desc == NULL)
+		return -1;
+
+	for (int i = 0; i < arrlen(src->lines); i++) {
+		struct posting_line new_line = src->lines[i];
+		if (src->lines[i].account) {
+			new_line.account = strdup(src->lines[i].account);
+			// TODO: free things here?
+			if (new_line.account == NULL)
+				return -1;
+		} else {
+			new_line.account = NULL;
+		}
+
+		if (src->lines[i].currency) {
+			new_line.currency = strdup(src->lines[i].currency);
+			// TODO: free things here?
+			if (new_line.currency == NULL)
+				return -1;
+		} else {
+			new_line.currency = NULL;
+		}
+
+		new_line.has_value = src->lines[i].has_value;
+		new_line.val = src->lines[i].val;
+		arrput(dst->lines, new_line);
+	}
 }

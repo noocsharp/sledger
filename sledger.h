@@ -19,3 +19,4 @@ struct posting_line {
 int process_postings(void (*processor)(struct posting *posting, void *data), void *data);
 int decimal_add(struct decimal *a, struct decimal *b, struct decimal *out);
 void decimal_print(struct decimal *val);
+void posting_dup(struct posting *dst, const struct posting *src);

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include <sys/types.h>
 
 #define STB_DS_IMPLEMENTATION
@@ -13,6 +14,8 @@
 #include "sledger.h"
 
 struct posting *sorted_postings;
+
+int factor = 1;
 
 int tmcmp(const struct tm *a, const struct tm *b) {
 	if (a->tm_year != b->tm_year) return a->tm_year - b->tm_year;
@@ -28,7 +31,7 @@ void sort_processor(struct posting *posting, void *data) {
 	while (left <= right) {
 		mid = left + (right - left) / 2;
 
-		if (tmcmp(&posting->time, &sorted_postings[mid].time) < 0) {
+		if (factor * tmcmp(&posting->time, &sorted_postings[mid].time) < 0) {
 			right = mid - 1;
 		} else {
 			left = mid + 1;
@@ -36,10 +39,20 @@ void sort_processor(struct posting *posting, void *data) {
 	}
 
 	arrins(sorted_postings, left, (struct posting){});
-	duplicate_posting(sorted_postings + left, posting);
+	assert(posting_dup(sorted_postings + left, posting) >= 0);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+	int opt;
+	while ((opt = getopt(argc, argv, "i")) != -1) {
+		switch (opt) {
+		case 'i':
+			factor = -1;
+			break;
+		default:
+		}
+	}
+
 	if (process_postings(sort_processor, NULL) == -1) {
 		return 1;
 	}

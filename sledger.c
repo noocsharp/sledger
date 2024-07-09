@@ -394,7 +394,7 @@ error:
 	return -1;
 }
 
-void posting_dup(struct posting *dst, const struct posting *src) {
+int posting_dup(struct posting *dst, const struct posting *src) {
 	dst->time = src->time;
 	dst->desc = strdup(src->desc);
 	if (dst->desc == NULL)
@@ -424,4 +424,6 @@ void posting_dup(struct posting *dst, const struct posting *src) {
 		new_line.val = src->lines[i].val;
 		arrput(dst->lines, new_line);
 	}
+
+	return 0;
 }

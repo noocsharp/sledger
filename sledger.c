@@ -16,9 +16,22 @@
 static unsigned long line, col;
 static int count = 0;
 
+static void
+decimal_reduce(struct decimal *a, struct decimal *b)
+{
+	while (a->sig % 10 == 0 && b->sig % 10 == 0 && a->places > 0 && b->places > 0) {
+		a->places--;
+		b->places--;
+		a->sig /= 10;
+		b->sig /= 10;
+	}
+}
+
 int
 decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
 {
+	decimal_reduce(_a, _b);
+
 	struct decimal a, b;
 	if (_a->places > _b->places) {
 		b = *_a;
@@ -39,13 +52,47 @@ decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
 
 	long sum = a.sig + b.sig;
 	if (a.sig < 0 && b.sig < 0 && sum > 0 ||
-	    a.sig > 0 && b.sig > 0 && sum < 0)
+		a.sig > 0 && b.sig > 0 && sum < 0)
 		return -1;
 
 	out->sig = a.sig + b.sig;
 	out->places = b.places;
 
 	return 0;
+}
+
+void decimal_abs(struct decimal *in, struct decimal *out)
+{
+	*out = *in;
+
+	if (out->sig < 0) {
+		out->sig = -out->sig;
+	}
+}
+
+int decimal_leq(struct decimal *_a, struct decimal *_b)
+{
+	decimal_reduce(_a, _b);
+
+	struct decimal a, b;
+	if (_a->places > _b->places) {
+		b = *_a;
+		a = *_b;
+	} else {
+		a = *_a;
+		b = *_b;
+	}
+
+	while (a.places < b.places) {
+		long new_sig = 10 * a.sig;
+		if (new_sig / 10 != a.sig) {
+			return -1;
+		}
+		a.sig = new_sig;
+		a.places++;
+	}
+
+	return a.sig - b.sig;
 }
 
 void

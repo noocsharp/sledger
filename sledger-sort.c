@@ -17,11 +17,30 @@ struct posting *sorted_postings;
 
 int factor = 1;
 
-int tmcmp(const struct tm *a, const struct tm *b) {
-	if (a->tm_year != b->tm_year) return a->tm_year - b->tm_year;
-	if (a->tm_mon != b->tm_mon) return a->tm_mon - b->tm_mon;
-	return a->tm_mday - b->tm_mday;
+int tmcmp(const struct posting *a, const struct posting *b) {
+	if (a->time.tm_year != b->time.tm_year) return a->time.tm_year - b->time.tm_year;
+	if (a->time.tm_mon != b->time.tm_mon) return a->time.tm_mon - b->time.tm_mon;
+	return a->time.tm_mday - b->time.tm_mday;
 }
+
+int flowcmp(const struct posting *a, const struct posting *b) {
+	struct decimal da = {}, db = {};
+
+	struct decimal temp;
+	for (int i = 0; i < arrlen(a->lines); i++) {
+		decimal_abs(&a->lines[i].val, &temp);
+		decimal_add(&da, &temp, &da);
+	}
+
+	for (int i = 0; i < arrlen(b->lines); i++) {
+		decimal_abs(&b->lines[i].val, &temp);
+		decimal_add(&db, &temp, &db);
+	}
+
+	return decimal_leq(&da, &db);
+}
+
+int (*cmp)(const struct posting *a, const struct posting *b) = NULL;
 
 void sort_processor(struct posting *posting, void *data) {
 	int left = 0;
@@ -31,7 +50,7 @@ void sort_processor(struct posting *posting, void *data) {
 	while (left <= right) {
 		mid = left + (right - left) / 2;
 
-		if (factor * tmcmp(&posting->time, &sorted_postings[mid].time) < 0) {
+		if (factor * cmp(posting, &sorted_postings[mid]) < 0) {
 			right = mid - 1;
 		} else {
 			left = mid + 1;
@@ -44,14 +63,23 @@ void sort_processor(struct posting *posting, void *data) {
 
 int main(int argc, char *argv[]) {
 	int opt;
-	while ((opt = getopt(argc, argv, "i")) != -1) {
+	while ((opt = getopt(argc, argv, "dfi")) != -1) {
 		switch (opt) {
 		case 'i':
 			factor = -1;
 			break;
+		case 'd':
+			cmp = tmcmp;
+			break;
+		case 'f':
+			cmp = flowcmp;
+			break;
 		default:
 		}
 	}
+
+	if (cmp == NULL)
+		return 1;
 
 	if (process_postings(sort_processor, NULL) == -1) {
 		return 1;

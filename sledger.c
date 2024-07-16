@@ -123,6 +123,12 @@ decimal_print(struct decimal *val)
 	}
 }
 
+int tmcmp(const struct posting *a, const struct posting *b) {
+	if (a->time.tm_year != b->time.tm_year) return a->time.tm_year - b->time.tm_year;
+	if (a->time.tm_mon != b->time.tm_mon) return a->time.tm_mon - b->time.tm_mon;
+	return a->time.tm_mday - b->time.tm_mday;
+}
+
 static int
 eat_whitespace(char *buf, size_t len, size_t min)
 {
@@ -141,6 +147,24 @@ eat_whitespace(char *buf, size_t len, size_t min)
 		return -1;
 
 	return startlen - len;
+}
+
+void
+print_posting(struct posting *posting)
+{
+    printf("%04d-%02d-%02d %s\n", 1900 + posting->time.tm_year, posting->time.tm_mon, posting->time.tm_mday, posting->desc);
+
+    for (int j = 0; j < arrlen(posting->lines); j++) {
+        printf("\t%s ", posting->lines[j].account);
+        if (posting->lines[j].has_value) {
+            decimal_print(&posting->lines[j].val);
+            printf("%s", posting->lines[j].currency);
+        }
+
+        putchar('\n');
+    }
+
+    putchar('\n');
 }
 
 static int

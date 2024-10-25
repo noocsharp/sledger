@@ -406,6 +406,7 @@ err1:
 	free(p->desc);
 	p->desc = NULL;
 err0:
+	*lineptr = linestart;
 	return -1;
 }
 

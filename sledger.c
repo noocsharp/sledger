@@ -173,8 +173,10 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	if (len < 1)
 		return -1;
 
-	if (*buf != '\t')
+	if (*buf != '\t') {
+		fprintf(stderr, "%ld:%ld: expected posting line to start with a tab\n", line, col);
 		return -1;
+	}
 
 	buf++;
 	len--;

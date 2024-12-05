@@ -185,7 +185,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	char *account = buf;
 	size_t account_len = 0;
 
-    // first character of account music be alphabetic, rest can be alphanumeric
+	// first character of account music be alphabetic, rest can be alphanumeric
 	if (len && isalpha(*buf)) {
 		account_len++;
 		buf++;
@@ -243,8 +243,15 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	// parse monetary value
 	bool have_point = false, present = false;
-	while (len && (isdigit(*buf) || *buf == '.')) {
+	while (len && (isdigit(*buf) || *buf == '.' || *buf == ',')) {
 		present = true;
+		if (*buf == ',') {
+			buf++;
+			len--;
+			col++;
+			continue;
+		}
+
 		if (*buf == '.') {
 			if (have_point)
 				break;
@@ -283,7 +290,10 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	pl->val = val;
 
-	eat_whitespace(buf, len, 0);
+	ret = eat_whitespace(buf, len, 0);
+	buf += ret;
+	len -= ret;
+	col += ret;
 
 	// TODO: handle non-ascii values
 
@@ -300,7 +310,10 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	if (pl->currency == NULL)
 		goto err1;
 
-	eat_whitespace(buf, len, 0);
+	ret = eat_whitespace(buf, len, 0);
+	buf += ret;
+	len -= ret;
+	col += ret;
 
 	// account for newline
 	buf++;
@@ -368,6 +381,7 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 	struct decimal total = {0};
 	struct posting_line pl = {0};
 	ssize_t read;
+	char *currency = NULL;
 
 	*lineptr = linestart;
 	while ((read = getline(lineptr, bufsize, stdin)) != -1) {
@@ -391,6 +405,14 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 
 		decimal_add(&total, &pl.val, &total);
 
+		if (currency && pl.currency && strcmp(currency, pl.currency) != 0) {
+			fprintf(stderr, "%ld:%ld: currency mismatch", line, col);
+			goto err2;
+		}
+
+		if (pl.currency)
+			currency = pl.currency;
+
 		arrput(p->lines, pl);
 	}
 
@@ -405,8 +427,10 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 	}
 
 	total.sig = -total.sig;
-	if (line_without_value_index != -1)
+	if (line_without_value_index != -1) {
 		p->lines[line_without_value_index].val = total;
+		p->lines[line_without_value_index].currency = strdup(currency);
+	}
 
 	return 0;
 

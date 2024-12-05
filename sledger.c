@@ -184,7 +184,16 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	char *account = buf;
 	size_t account_len = 0;
-	while (len && (isalpha(*buf) || *buf == ':')) {
+
+    // first character of account music be alphabetic, rest can be alphanumeric
+	if (len && isalpha(*buf)) {
+		account_len++;
+		buf++;
+		len--;
+		col++;
+	}
+
+	while (len && (isalnum(*buf) || *buf == ':' || *buf == '_')) {
 		account_len++;
 		buf++;
 		len--;

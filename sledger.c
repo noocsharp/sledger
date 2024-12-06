@@ -336,46 +336,45 @@ bool isemptyline(char *lineptr, size_t n) {
 }
 
 static int
-parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
+parse_posting(char *buf, size_t len, struct posting *p)
 {
-	char **lineptr = buf;
-	char *linestart = *buf;
-	if (*len < strlen("0000-00-00")) {
+	char *linestart = buf;
+	if (len < strlen("0000-00-00")) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
 		goto err0;
 	}
 
-	char *dateend = strptime(*buf, "%Y-%m-%d", &p->time);
+	char *dateend = strptime(buf, "%Y-%m-%d", &p->time);
 	if (dateend == NULL) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
 		goto err0;
 	}
 
-	*len -= dateend - *buf;
-	col += dateend - *buf;
-	*buf = dateend;
+	len -= dateend - buf;
+	col += dateend - buf;
+	buf = dateend;
 
-	int ret = eat_whitespace(*buf, *len, 1);
+	int ret = eat_whitespace(buf, len, 1);
 	if (ret == -1) {
 		fprintf(stderr, "%ld:%ld: expected description for posting\n", line, col);
 		goto err0;
 	}
 
-	*buf += ret;
-	*len -= ret;
+	buf += ret;
+	len -= ret;
 	col += ret;
 
-	char *nl = memchr(*buf, '\n', *len);
+	char *nl = memchr(buf, '\n', len);
 	if (nl == NULL) {
-		col += *len;
+		col += len;
 		fprintf(stderr, "%ld:%ld: expected newline after posting description\n", line, col);
 		goto err0;
 	}
 
-	p->desc = strndup(*buf, nl - *buf);
+	p->desc = strndup(buf, nl - buf);
 
-	*len -= nl - *buf + 1;
-	*buf = nl + 1;
+	len -= nl - buf + 1;
+	buf = nl + 1;
 
 	int line_without_value_index = -1;
 	struct decimal total = {0};
@@ -383,14 +382,15 @@ parse_posting(char **buf, size_t *bufsize, size_t *len, struct posting *p)
 	ssize_t read;
 	char *currency = NULL;
 
-	*lineptr = linestart;
-	while ((read = getline(lineptr, bufsize, stdin)) != -1) {
+	char *lineptr = NULL;
+	size_t n = 0;
+	while ((read = getline(&lineptr, &n, stdin)) != -1) {
 		line++; col = 1;
-		if (isemptyline(*lineptr, read))
+		if (isemptyline(lineptr, read))
 			break;
 
 		pl = (struct posting_line){0};
-		ssize_t used = parse_posting_line(*lineptr, read, &pl);
+		ssize_t used = parse_posting_line(lineptr, read, &pl);
 		if (used == -1)
 			goto err1;
 
@@ -441,7 +441,6 @@ err1:
 	free(p->desc);
 	p->desc = NULL;
 err0:
-	*lineptr = linestart;
 	return -1;
 }
 
@@ -462,7 +461,7 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 
 		posting = (struct posting){0};
 
-		int ret = parse_posting(&lineptr, &n, &read, &posting);
+		int ret = parse_posting(lineptr, read, &posting);
 		if (ret == -1) {
 			fprintf(stderr, "parsing failed\n");
 			goto error;

@@ -57,7 +57,7 @@ int main() {
 	qsort(accounts, shlenu(accounts), sizeof(struct account), &strcmp_keys);
 	for (size_t i = 0; i < shlenu(accounts); i++) {
 		printf("%s\t", accounts[i].key);
-		decimal_print(&accounts[i].value);
+		decimal_print(&accounts[i].value, 2);
 		ptrdiff_t currency_idx = shgeti(account_currencies, accounts[i].key);
 		assert(currency_idx != -1);
 		printf(" %s", account_currencies[currency_idx].value);

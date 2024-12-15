@@ -96,7 +96,7 @@ int decimal_leq(struct decimal *_a, struct decimal *_b)
 }
 
 void
-decimal_print(struct decimal *val)
+decimal_print(struct decimal *val, int minplaces)
 {
 	char buf[22];
 	int len = 0;
@@ -109,17 +109,26 @@ decimal_print(struct decimal *val)
 		putchar('-');
 	}
 
-	while (sig > 0) {
+	while (places--) {
 		buf[len++] = '0' + (sig % 10);
-		places--;
+		sig /= 10;
+		if (minplaces > 0)
+			minplaces--;
+	}
 
-		if (places == 0)
-			buf[len++] = '.';
+	buf[len++] = '.';
+
+	while (sig) {
+		buf[len++] = '0' + (sig % 10);
 		sig /= 10;
 	}
 
 	for (len -= 1; len >= 0; len--) {
 		putchar(buf[len]);
+	}
+
+	while (minplaces-- > 0) {
+		putchar('0');
 	}
 }
 
@@ -157,7 +166,7 @@ print_posting(struct posting *posting)
 	for (int j = 0; j < arrlen(posting->lines); j++) {
 		printf("\t%s ", posting->lines[j].account);
 		if (posting->lines[j].has_value) {
-			decimal_print(&posting->lines[j].val);
+			decimal_print(&posting->lines[j].val, 2);
 			printf("%s", posting->lines[j].currency);
 		}
 

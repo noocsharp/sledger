@@ -250,6 +250,12 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		col++;
 	}
 
+	if (*buf == '+') {
+		buf++;
+		len--;
+		col++;
+	}
+
 	// parse monetary value
 	bool have_point = false, present = false;
 	while (len && (isdigit(*buf) || *buf == '.' || *buf == ',')) {

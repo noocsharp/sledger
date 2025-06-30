@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE /* strptime */
+
 #include <assert.h>
 #include <ctype.h>
 #include <stdbool.h>

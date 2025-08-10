@@ -399,7 +399,20 @@ parse_posting(char *buf, size_t len, struct posting *p)
 
 	char *lineptr = NULL;
 	size_t n = 0;
-	while ((read = getline(&lineptr, &n, stdin)) != -1) {
+	while (1) {
+		char c;
+		if ((c = getc(stdin)) != EOF) {
+			if (!isspace(c)) {
+				break;
+			}
+
+			ungetc(c, stdin);
+		}
+
+		if ((read = getline(&lineptr, &n, stdin)) == -1) {
+			break;
+		}
+
 		line++; col = 1;
 		if (isemptyline(lineptr, read))
 			break;

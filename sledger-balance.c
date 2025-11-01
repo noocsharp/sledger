@@ -28,6 +28,8 @@ struct account_tree {
 	char *key;
 	struct account_tree *value;
 	char *path;
+	struct decimal val;
+	char *currency;
 } *account_tree = NULL;
 
 int strcmp_keys(const void *a, const void *b) {
@@ -42,9 +44,13 @@ int account_tree_add(char *account) {
 	do {
 		if (*curtree == NULL || shgeti(*curtree, tok) == -1) {
 			shput(*curtree, tok, NULL);
+			struct account_tree *temp =  &shgets(*curtree, tok);
+			temp->path = NULL;
+			temp->val = (struct decimal){0};
 		}
 		parenttree = &shgets(*curtree, tok);
-		parenttree->path = NULL;
+		decimal_add(&parenttree->val, &shget(accounts, account), &parenttree->val);
+		parenttree->currency = shget(account_currencies, account);
 		curtree = &shget(*curtree, tok);
 	} while ((tok = strtok(NULL, ":")) != NULL);
 
@@ -63,8 +69,6 @@ void account_processor(struct posting *posting, void *data) {
 			assert(account_currency);
 			shput(accounts, account, posting->lines[i].val);
 			shput(account_currencies, account, account_currency);
-			if (tree)
-				account_tree_add(account);
 		} else {
 			decimal_add(&accounts[idx].value, &posting->lines[i].val, &val);
 			ptrdiff_t currency_idx = shgeti(account_currencies, posting->lines[i].account);
@@ -100,20 +104,18 @@ void print_account_tree(struct account_tree *tree, int padding, int maxwidth) {
 		}
 
 		if (tree[i].key != NULL) {
-			if (tree[i].path) {
-				struct decimal value = shget(accounts, tree[i].path);
-				printf("%s", tree[i].key);
-				for (int j = strlen(tree[i].key) + padding; j < maxwidth + 2; j++) {
-					putchar(' ');
-				}
-				decimal_print(&value, 2);
-				ptrdiff_t currency_idx = shgeti(account_currencies, tree[i].path);
-				assert(currency_idx != -1);
-				printf(" %s", account_currencies[currency_idx].value);
-				putchar('\n');
-			} else {
-				printf("%s\n", tree[i].key);
+			printf("%s", tree[i].key);
+			for (int j = strlen(tree[i].key) + padding; j < maxwidth + 2; j++) {
+				putchar(' ');
 			}
+
+			decimal_print(&tree[i].val, 2);
+			/*
+			ptrdiff_t currency_idx = shgeti(account_currencies, tree[i].path);
+			assert(currency_idx != -1);
+			printf(" %s", account_currencies[currency_idx].value);
+			*/
+			putchar('\n');
 			print_account_tree(tree[i].value, padding + 4, maxwidth);
 		}
 	}
@@ -136,9 +138,14 @@ int main(int argc, char **argv) {
 	if (process_postings(account_processor, NULL) == -1) {
 		return 1;
 	}
-	// WARNING: accounts is destroyed and is no longer a valid string hash table
+
 	if (tree) {
+		for (int i = 0; i < shlen(accounts); i++) {
+			account_tree_add(accounts[i].key);
+		}
+
 		print_account_tree(account_tree, 0, calculate_account_tree(account_tree, 0));
+	// WARNING: accounts is destroyed and is no longer a valid string hash table
 	} else {
 		qsort(accounts, shlenu(accounts), sizeof(struct account), &strcmp_keys);
 		for (size_t i = 0; i < shlenu(accounts); i++) {

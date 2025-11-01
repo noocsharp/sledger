@@ -15,18 +15,32 @@
 
 #include "sledger.h"
 
-struct tm before, after;
-bool check_before, check_after;
+char *account;
+struct tm begin, end;
+bool check_account, check_begin, check_end;
 
-void sort_processor(struct posting *posting, void *data) {
+void filter_processor(struct posting *posting, void *data) {
 	struct posting temp_posting;
 
-	temp_posting.time = before;
-	if (check_before && tmcmp(&temp_posting, posting) < 0)
+	if (check_account) {
+		bool found = false;
+		for (int i = 0; i < arrlen(posting->lines); i++) {
+			if (strncmp(account, posting->lines[i].account, strlen(account)) == 0) {
+				found = true;
+				break;
+			}
+		}
+
+		if (!found)
+			return;
+	}
+
+	temp_posting.time = begin;
+	if (check_begin && tmcmp(&temp_posting, posting) > 0)
 		return;
 
-	temp_posting.time = after;
-	if (check_after && tmcmp(&temp_posting, posting) > 0)
+	temp_posting.time = end;
+	if (check_end && tmcmp(&temp_posting, posting) < 0)
 		return;
 
 	print_posting(posting);
@@ -35,19 +49,23 @@ void sort_processor(struct posting *posting, void *data) {
 int main(int argc, char *argv[]) {
 	int opt;
 	char *dateend;
-	while ((opt = getopt(argc, argv, "a:b:")) != -1) {
+	while ((opt = getopt(argc, argv, "a:b:e:")) != -1) {
 		switch (opt) {
 		case 'a':
-			check_after = true;
-			dateend = strptime(optarg, "%Y-%m-%d", &after);
+			check_account = true;
+			account = optarg;
+			break;
+		case 'b':
+			check_begin = true;
+			dateend = strptime(optarg, "%Y-%m-%d", &begin);
 			if (dateend == NULL) {
 				fprintf(stderr, "-%c: invalid date\n", opt);
 				return 1;
 			}
 			break;
-		case 'b':
-			check_before = true;
-			dateend = strptime(optarg, "%Y-%m-%d", &before);
+		case 'e':
+			check_end = true;
+			dateend = strptime(optarg, "%Y-%m-%d", &end);
 			if (dateend == NULL) {
 				fprintf(stderr, "-%c: invalid date\n", opt);
 				return 1;
@@ -57,7 +75,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	if (process_postings(sort_processor, NULL) == -1) {
+	if (process_postings(filter_processor, NULL) == -1) {
 		return 1;
 	}
 

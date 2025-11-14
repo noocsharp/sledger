@@ -314,7 +314,11 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	char *currency = buf;
 	size_t currency_len = 0;
-	while (len && isalpha(*buf)) {
+	if (!isalpha(*buf)) {
+		fprintf(stderr, "%ld:%ld: expected first character of currency to be a letter\n", line, col);
+		goto err1;
+	}
+	while (len && (isalnum(*buf) || *buf == '_')) {
 		currency_len++;
 		buf++;
 		len--;
@@ -432,11 +436,6 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		}
 
 		decimal_add(&total, &pl.val, &total);
-
-		if (currency && pl.currency && strcmp(currency, pl.currency) != 0) {
-			fprintf(stderr, "%ld:%ld: currency mismatch", line, col);
-			goto err2;
-		}
 
 		if (pl.currency)
 			currency = pl.currency;

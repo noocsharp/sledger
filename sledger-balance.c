@@ -14,15 +14,15 @@
 
 bool tree = false;
 
+struct account_data {
+	char *key; /* currency */
+	struct decimal value; /* quantity */
+};
+
 struct account {
 	char *key;
-	struct decimal value;
+	struct account_data *value;
 } *accounts = NULL;
-
-struct account_currency {
-	char *key;
-	char *value;
-} *account_currencies = NULL;
 
 struct account_tree {
 	char *key;
@@ -49,8 +49,9 @@ int account_tree_add(char *account) {
 			temp->val = (struct decimal){0};
 		}
 		parenttree = &shgets(*curtree, tok);
-		decimal_add(&parenttree->val, &shget(accounts, account), &parenttree->val);
-		parenttree->currency = shget(account_currencies, account);
+		// TODO: replace with something when account processing is fixed with new currency model
+		//decimal_add(&parenttree->val, &shget(accounts, account), &parenttree->val);
+		//parenttree->currency = shget(account_currencies, account);
 		curtree = &shget(*curtree, tok);
 	} while ((tok = strtok(NULL, ":")) != NULL);
 
@@ -61,22 +62,25 @@ int account_tree_add(char *account) {
 void account_processor(struct posting *posting, void *data) {
 	struct decimal val;
 	for (int i = 0; i < arrlen(posting->lines); i++) {
-		ptrdiff_t idx = shgeti(accounts, posting->lines[i].account);
-		if (idx == -1) {
+		struct account *account = shgetp_null(accounts, posting->lines[i].account);
+		if (account == NULL) {
 			char *account = strdup(posting->lines[i].account);
-			char *account_currency = strdup(posting->lines[i].currency);
+			char *currency = strdup(posting->lines[i].currency);
 			assert(account);
-			assert(account_currency);
-			shput(accounts, account, posting->lines[i].val);
-			shput(account_currencies, account, account_currency);
+			assert(currency);
+			struct account_data *account_data = NULL;
+			shput(account_data, currency, posting->lines[i].val);
+			shput(accounts, account, account_data);
 		} else {
-			decimal_add(&accounts[idx].value, &posting->lines[i].val, &val);
-			ptrdiff_t currency_idx = shgeti(account_currencies, posting->lines[i].account);
-			assert(currency_idx != -1);
-			if (strcmp(account_currencies[currency_idx].value, posting->lines[i].currency) != 0) {
-				fprintf(stderr, "currency mismatch for account %s", posting->lines[i].account);
+			struct account_data *currency_entry = shgetp_null(account->value, posting->lines[i].currency);
+
+			if (currency_entry == NULL) {
+				char *currency = strdup(posting->lines[i].currency);
+				assert(currency);
+				shput(account->value, currency, posting->lines[i].val);
+			} else {
+				decimal_add(&currency_entry->value, &posting->lines[i].val, &currency_entry->value);
 			}
-			shput(accounts, accounts[idx].key, val);
 		}
 	}
 }
@@ -150,10 +154,11 @@ int main(int argc, char **argv) {
 		qsort(accounts, shlenu(accounts), sizeof(struct account), &strcmp_keys);
 		for (size_t i = 0; i < shlenu(accounts); i++) {
 			printf("%s\t", accounts[i].key);
-			decimal_print(&accounts[i].value, 2);
-			ptrdiff_t currency_idx = shgeti(account_currencies, accounts[i].key);
-			assert(currency_idx != -1);
-			printf(" %s", account_currencies[currency_idx].value);
+			for (size_t j = 0; j < shlenu(accounts[i].value); j++) {
+				struct account_data *data = &accounts[i].value[j];
+				decimal_print(&data->value, 2);
+				printf(" %s\t", data->key);
+			}
 			putchar('\n');
 		}
 	}

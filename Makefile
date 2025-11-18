@@ -1,4 +1,4 @@
-all: sledger-accounts sledger-balance sledger-sort sledger-filter sledger-cashflow
+all: sledger-accounts sledger-balance sledger-sort sledger-filter sledger-cashflow sledger-display
 
 sledger-accounts: sledger-accounts.o sledger.o
 	$(CC) sledger-accounts.o sledger.o -o sledger-accounts
@@ -15,6 +15,9 @@ sledger-filter: sledger-filter.o sledger.o
 sledger-cashflow: sledger-cashflow.o sledger.o
 	$(CC) sledger-cashflow.o sledger.o -o sledger-cashflow
 
+sledger-display: sledger-display.o sledger.o
+	$(CC) sledger-display.o sledger.o -o sledger-display
+
 sledger-accounts.o: sledger-accounts.c
 	$(CC) -c sledger-accounts.c -o sledger-accounts.o
 
@@ -29,6 +32,9 @@ sledger-filter.o: sledger-filter.c
 
 sledger-cashflow.o: sledger-cashflow.c
 	$(CC) -c sledger-cashflow.c -o sledger-cashflow.o
+
+sledger-display.o: sledger-display.c
+	$(CC) -c sledger-display.c -o sledger-display.o
 
 sledger.o: sledger.c
 	$(CC) -c sledger.c -o sledger.o

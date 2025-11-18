@@ -132,6 +132,64 @@ decimal_print(struct decimal *val, int minplaces)
 	}
 }
 
+ssize_t decimal_parse(struct decimal *out, const char *buf, size_t len) {
+	bool have_point = false;
+	size_t startlen = len;
+
+	bool neg = false;
+	if (*buf == '-') {
+		neg = true;
+		buf++;
+		len--;
+	}
+
+	if (*buf == '+') {
+		buf++;
+		len--;
+	}
+
+	if (!isdigit(*buf) && *buf != '.') {
+		return -1;
+	}
+
+	while (len && (isdigit(*buf) || *buf == '.' || *buf == ',')) {
+		if (*buf == ',') {
+			buf++;
+			len--;
+			continue;
+		}
+
+		if (*buf == '.') {
+			if (have_point)
+				break;
+
+			have_point = true;
+			buf++;
+			len--;
+			continue;
+		}
+
+		if (have_point)
+			out->places++;
+
+		long new_sig = 10 * out->sig;
+		if (new_sig / 10 != out->sig) {
+			return -2;
+		}
+
+		new_sig += *buf - '0';
+		if (new_sig < 0)
+			return -3;
+
+		out->sig = new_sig;
+		buf++;
+		len--;
+	}
+
+	if (neg) out->sig = -out->sig;
+	return startlen - len;
+}
+
 int tmcmp(const struct posting *a, const struct posting *b) {
 	if (a->time.tm_year != b->time.tm_year) return a->time.tm_year - b->time.tm_year;
 	if (a->time.tm_mon != b->time.tm_mon) return a->time.tm_mon - b->time.tm_mon;
@@ -241,67 +299,23 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	if (len == 0)
 		goto err1;
 
-	struct decimal val = {0};
-	bool neg = false;
-	if (*buf == '-') {
-		neg = true;
-		buf++;
-		len--;
-		col++;
-	}
-
-	if (*buf == '+') {
-		buf++;
-		len--;
-		col++;
-	}
-
 	// parse monetary value
-	bool have_point = false, present = false;
-	while (len && (isdigit(*buf) || *buf == '.' || *buf == ',')) {
-		present = true;
-		if (*buf == ',') {
-			buf++;
-			len--;
-			col++;
-			continue;
-		}
+	struct decimal val = {0};
 
-		if (*buf == '.') {
-			if (have_point)
-				break;
-
-			have_point = true;
-			buf++;
-			len--;
-			col++;
-			continue;
-		}
-
-		if (have_point)
-			val.places++;
-
-		long new_sig = 10 * val.sig;
-		if (new_sig / 10 != val.sig) {
-			goto err1;
-		}
-
-		new_sig += *buf - '0';
-		if (new_sig < 0)
-			goto err1;
-
-		val.sig = new_sig;
-		buf++;
-		len--;
-		col++;
-	}
-
-	if (!present) {
-		fprintf(stderr, "%ld:%ld: expected value after account name '%s'\n", line, col, pl->account);
+	ret = decimal_parse(&val, buf, len);
+	if (ret < 0) {
+		fprintf(stderr, "%ld:%ld: invalid decimal\n", line, col);
 		goto err1;
 	}
 
-	if (neg) val.sig = -val.sig;
+	buf += ret;
+	len -= ret;
+	col += ret;
+
+	if (ret == 0) {
+		fprintf(stderr, "%ld:%ld: expected value after account name '%s'\n", line, col, pl->account);
+		goto err1;
+	}
 
 	pl->val = val;
 

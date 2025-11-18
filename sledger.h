@@ -24,3 +24,4 @@ void decimal_abs(struct decimal *in, struct decimal *out);
 void decimal_print(struct decimal *val, int minplaces);
 int tmcmp(const struct posting *a, const struct posting *b);
 int posting_dup(struct posting *dst, const struct posting *src);
+ssize_t decimal_parse(struct decimal *out, const char *buf, size_t len);

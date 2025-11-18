@@ -41,7 +41,6 @@ int add_account(char *account, struct decimal value, char *currency) {
 			char *currency_duped = strdup(currency);
 			assert(currency_duped);
 			shput(parenttree->amount, currency_duped, (struct decimal){0});
-			//fprintf(stderr, "ccc: %s\n", currency_duped);
 			amount_for_currency = shgetp(parenttree->amount, currency_duped);
 		}
 

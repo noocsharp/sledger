@@ -71,13 +71,21 @@ void print_account_tree(struct account_tree *tree, int padding, int maxwidth) {
 	}
 }
 
+struct currency_list {
+	char *key;
+	bool value;
+} *currencies = NULL;
+
 int main(int argc, char **argv) {
 	int opt;
 	bool balance = false;
-	while ((opt = getopt(argc, argv, "b")) != -1) {
+	while ((opt = getopt(argc, argv, "bc:")) != -1) {
 		switch (opt) {
 		case 'b':
 			balance = true;
+			break;
+		case 'c':
+			shput(currencies, optarg, true);
 			break;
 		default:
 			fprintf(stderr, "-%c: invalid opt", opt);
@@ -102,7 +110,7 @@ int main(int argc, char **argv) {
 			fprintf(stderr, "expected value on line '%s'\n", line);
 		}
 
-		char *tok = strtok(valuestr, ":");
+		char *tok = strtok(valuestr, "\t");
 		struct account_tree *parenttree = NULL, **curtree = &account_tree;
 		do {
 			struct decimal value = {0};
@@ -126,11 +134,17 @@ int main(int argc, char **argv) {
 			if (newline)
 				*newline = '\0';
 
-			add_account(account, value, currency);
+			if (currencies) {
+				if (shgetp_null(currencies, currency) != NULL) {
+					add_account(account, value, currency);
+				}
+			} else {
+				add_account(account, value, currency);
+			}
 		} while ((tok = strtok(NULL, ":")) != NULL);
 	}
 
-	print_account_tree(account_tree, 0, 20);
+	print_account_tree(account_tree, 0, 30);
 
 	return 0;
 }

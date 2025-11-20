@@ -63,7 +63,7 @@ void print_account_tree(struct account_tree *tree, int padding, int maxwidth) {
 
 			for (int j = 0; j < shlenu(tree[i].amount); j++) {
 				decimal_print(&tree[i].amount[j].value, 2);
-				printf(" %s", tree[i].amount[j].key);
+				printf(" %s\t", tree[i].amount[j].key);
 			}
 			putchar('\n');
 			print_account_tree(tree[i].value, padding + 4, maxwidth);

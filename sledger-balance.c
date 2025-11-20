@@ -12,6 +12,7 @@
 
 #include "sledger.h"
 
+bool show_zero_accounts;
 
 struct account_data {
 	char *key; /* currency */
@@ -55,8 +56,11 @@ void account_processor(struct posting *posting, void *data) {
 
 int main(int argc, char **argv) {
 	int opt;
-	while ((opt = getopt(argc, argv, "t")) != -1) {
+	while ((opt = getopt(argc, argv, "z")) != -1) {
 		switch (opt) {
+		case 'z':
+			show_zero_accounts = true;
+			break;
 		default:
 			fprintf(stderr, "-%c: invalid opt", opt);
 			return 1;
@@ -71,8 +75,26 @@ int main(int argc, char **argv) {
 	// WARNING: accounts is destroyed and is no longer a valid string hash table
 	qsort(accounts, shlenu(accounts), sizeof(struct account), &strcmp_keys);
 	for (size_t i = 0; i < shlenu(accounts); i++) {
+		if (!show_zero_accounts) {
+			bool any_nonzero = false;
+			for (size_t j = 0; j < shlenu(accounts[i].value); j++) {
+				if (accounts[i].value[j].value.sig != 0) {
+					any_nonzero = true;
+					break;
+				}
+			}
+
+			if (!any_nonzero)
+				continue;
+		}
+
+
 		printf("%s\t", accounts[i].key);
 		for (size_t j = 0; j < shlenu(accounts[i].value); j++) {
+			if (!show_zero_accounts && accounts[i].value[j].value.sig == 0) {
+				continue;
+			}
+
 			struct account_data *data = &accounts[i].value[j];
 			decimal_print(&data->value, 2);
 			printf(" %s\t", data->key);

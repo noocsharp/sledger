@@ -26,7 +26,8 @@ struct account_tree {
 int add_account(char *account, struct decimal value, char *currency) {
 	char *tokaccount = strdup(account);
 	assert(tokaccount);
-	char *tok = strtok(tokaccount, ":");
+	char *saveptr;
+	char *tok = strtok_r(tokaccount, ":", &saveptr);
 	struct account_tree *parenttree = NULL, **curtree = &account_tree;
 	do {
 		if (*curtree == NULL || shgeti(*curtree, tok) == -1) {
@@ -46,7 +47,7 @@ int add_account(char *account, struct decimal value, char *currency) {
 
 		decimal_add(&amount_for_currency->value, &value, &amount_for_currency->value);
 		curtree = &shget(*curtree, tok);
-	} while ((tok = strtok(NULL, ":")) != NULL);
+	} while ((tok = strtok_r(NULL, ":", &saveptr)) != NULL);
 }
 
 void print_account_tree(struct account_tree *tree, int padding, int maxwidth) {
@@ -104,32 +105,43 @@ int main(int argc, char **argv) {
 		if (delim == NULL) {
 			fprintf(stderr, "expected tab on line '%s'\n", line);
 		}
+
 		char *valuestr = delim + 1;
 		*delim = '\0';
+		fprintf(stderr, "account: %s\n", account);
 		if (*valuestr == '\n') {
 			fprintf(stderr, "expected value on line '%s'\n", line);
 		}
 
-		char *tok = strtok(valuestr, "\t");
-		struct account_tree *parenttree = NULL, **curtree = &account_tree;
+		char *saveptr;
+		char *tok = strtok_r(valuestr, "\t", &saveptr);
+		if (tok == NULL) {
+			fprintf(stderr, "expected value on line '%s'\n", line);
+		}
+
 		do {
+			if (*tok == '\n')
+				break;
+
 			struct decimal value = {0};
-			ssize_t len = decimal_parse(&value, valuestr, strlen(valuestr));
+			ssize_t len = decimal_parse(&value, tok, strlen(tok));
 			if (len < 0) {
-				fprintf(stderr, "invalid decimal '%s'\n", valuestr);
+				fprintf(stderr, "invalid decimal '%s'\n", tok);
 				return 1;
 			}
 
-			char *aftervalue = valuestr + len;
+			char *aftervalue = tok + len;
 			while (isspace(*aftervalue)) {
 				aftervalue++;
 			}
 
 			if (*aftervalue == '\0') {
 				fprintf(stderr, "expected currency after value\n");
+				return 1;
 			}
 
 			char *currency = aftervalue;
+			fprintf(stderr, "currency: %s\n", currency);
 			char *newline = strchr(currency, '\n');
 			if (newline)
 				*newline = '\0';
@@ -141,7 +153,8 @@ int main(int argc, char **argv) {
 			} else {
 				add_account(account, value, currency);
 			}
-		} while ((tok = strtok(NULL, ":")) != NULL);
+			fprintf(stderr, "token done\n");
+		} while ((tok = strtok_r(NULL, "\t", &saveptr)) != NULL);
 	}
 
 	print_account_tree(account_tree, 0, 30);

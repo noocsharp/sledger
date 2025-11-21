@@ -420,11 +420,10 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	while (1) {
 		char c;
 		if ((c = getc(stdin)) != EOF) {
+			ungetc(c, stdin);
 			if (!isspace(c)) {
 				break;
 			}
-
-			ungetc(c, stdin);
 		}
 
 		if ((read = getline(&lineptr, &n, stdin)) == -1) {

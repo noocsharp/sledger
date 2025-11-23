@@ -108,7 +108,6 @@ int main(int argc, char **argv) {
 
 		char *valuestr = delim + 1;
 		*delim = '\0';
-		fprintf(stderr, "account: %s\n", account);
 		if (*valuestr == '\n') {
 			fprintf(stderr, "expected value on line '%s'\n", line);
 		}
@@ -141,7 +140,6 @@ int main(int argc, char **argv) {
 			}
 
 			char *currency = aftervalue;
-			fprintf(stderr, "currency: %s\n", currency);
 			char *newline = strchr(currency, '\n');
 			if (newline)
 				*newline = '\0';
@@ -153,7 +151,6 @@ int main(int argc, char **argv) {
 			} else {
 				add_account(account, value, currency);
 			}
-			fprintf(stderr, "token done\n");
 		} while ((tok = strtok_r(NULL, "\t", &saveptr)) != NULL);
 	}
 

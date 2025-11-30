@@ -1,4 +1,6 @@
-all: sledger-accounts sledger-balance sledger-sort sledger-filter sledger-cashflow sledger-display
+EXE=sledger-accounts sledger-balance sledger-sort sledger-filter sledger-cashflow sledger-display sledger-register
+
+all: $(EXE)
 
 sledger-accounts: sledger-accounts.o sledger.o
 	$(CC) sledger-accounts.o sledger.o -o sledger-accounts
@@ -44,3 +46,6 @@ sledger-register.o: sledger-register.c
 
 sledger.o: sledger.c
 	$(CC) -c sledger.c -o sledger.o
+
+clean:
+	rm -f $(EXE)

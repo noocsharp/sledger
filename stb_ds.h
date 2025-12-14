@@ -498,6 +498,8 @@ extern void * stbds_hmdel_key(void *a, size_t elemsize, void *key, size_t keysiz
 extern void * stbds_shmode_func(size_t elemsize, int mode);
 
 #if defined(__GNUC__) || defined(__clang__)
+#define STBDS_HAS_TYPEOF
+#endif
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
 #define STBDS_HAS_LITERAL_ARRAY

@@ -15,7 +15,7 @@
 
 #include "sledger.h"
 
-char *account;
+char **account;
 struct tm begin, end;
 bool check_account, check_begin, check_end;
 
@@ -25,9 +25,11 @@ void filter_processor(struct posting *posting, void *data) {
 	if (check_account) {
 		bool found = false;
 		for (int i = 0; i < arrlen(posting->lines); i++) {
-			if (strncmp(account, posting->lines[i].account, strlen(account)) == 0) {
-				found = true;
-				break;
+			for (int j = 0; j < arrlen(account); j++) {
+				if (strncmp(account[j], posting->lines[i].account, strlen(account[j])) == 0) {
+					found = true;
+					break;
+				}
 			}
 		}
 
@@ -53,7 +55,7 @@ int main(int argc, char *argv[]) {
 		switch (opt) {
 		case 'a':
 			check_account = true;
-			account = optarg;
+			arrput(account, optarg);
 			break;
 		case 'b':
 			check_begin = true;

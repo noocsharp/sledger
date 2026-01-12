@@ -1,4 +1,4 @@
-EXE=sledger-accounts sledger-balance sledger-sort sledger-filter sledger-cashflow sledger-display sledger-register
+EXE=sledger-accounts sledger-balance sledger-sort sledger-filter sledger-cashflow sledger-display sledger-register sledger-convert
 
 all: $(EXE)
 
@@ -23,6 +23,12 @@ sledger-display: sledger-display.o sledger.o
 sledger-register: sledger-register.o sledger.o
 	$(CC) sledger-register.o sledger.o -o sledger-register
 
+sledger-convert: sledger-convert.o sledger.o
+	$(CC) sledger-convert.o sledger.o -o sledger-convert
+
+sledger-units: sledger-units.o sledger.o
+	$(CC) sledger-units.o sledger.o -o sledger-units
+
 sledger-accounts.o: sledger-accounts.c
 	$(CC) -c sledger-accounts.c -o sledger-accounts.o
 
@@ -43,6 +49,12 @@ sledger-display.o: sledger-display.c
 
 sledger-register.o: sledger-register.c
 	$(CC) -c sledger-register.c -o sledger-register.o
+
+sledger-convert.o: sledger-convert.c
+	$(CC) -c sledger-convert.c -o sledger-convert.o
+
+sledger-units.o: sledger-units.c
+	$(CC) -c sledger-units.c -o sledger-units.o
 
 sledger.o: sledger.c
 	$(CC) -c sledger.c -o sledger.o

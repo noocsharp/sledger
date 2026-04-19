@@ -24,6 +24,11 @@ struct account {
 	struct account_data *value;
 } *accounts = NULL;
 
+struct currency_list {
+	char *key;
+	bool value;
+} *currencies = NULL;
+
 int strcmp_keys(const void *a, const void *b) {
 	return strcmp(((struct account *)a)->key, ((struct account *)b)->key);
 }
@@ -56,10 +61,13 @@ void account_processor(struct posting *posting, void *data) {
 
 int main(int argc, char **argv) {
 	int opt;
-	while ((opt = getopt(argc, argv, "z")) != -1) {
+	while ((opt = getopt(argc, argv, "zc:")) != -1) {
 		switch (opt) {
 		case 'z':
 			show_zero_accounts = true;
+			break;
+		case 'c':
+			shput(currencies, optarg, true);
 			break;
 		default:
 			fprintf(stderr, "-%c: invalid opt", opt);
@@ -96,6 +104,10 @@ int main(int argc, char **argv) {
 			}
 
 			struct account_data *data = &accounts[i].value[j];
+			if (currencies && shgeti(currencies, data->key) == -1) {
+				continue;
+			}
+
 			decimal_print(&data->value, 2);
 			printf(" %s\t", data->key);
 		}

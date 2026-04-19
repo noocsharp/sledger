@@ -2,6 +2,9 @@ EXE=sledger-accounts sledger-balance sledger-sort sledger-filter sledger-cashflo
 
 all: $(EXE)
 
+install:
+	cp $(EXE) /usr/local/bin
+
 sledger-accounts: sledger-accounts.o sledger.o
 	$(CC) sledger-accounts.o sledger.o -o sledger-accounts
 
@@ -61,3 +64,4 @@ sledger.o: sledger.c
 
 clean:
 	rm -f $(EXE)
+	rm *.o

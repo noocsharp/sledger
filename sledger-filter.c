@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
 		case 'b':
 			check_begin = true;
 			dateend = strptime(optarg, "%Y-%m-%d", &begin);
-			if (dateend == NULL) {
+			if (dateend == NULL || *dateend != 0) {
 				fprintf(stderr, "-%c: invalid date\n", opt);
 				return 1;
 			}
@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
 		case 'e':
 			check_end = true;
 			dateend = strptime(optarg, "%Y-%m-%d", &end);
-			if (dateend == NULL) {
+			if (dateend == NULL || *dateend != 0) {
 				fprintf(stderr, "-%c: invalid date\n", opt);
 				return 1;
 			}

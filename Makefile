@@ -63,5 +63,4 @@ sledger.o: sledger.c
 	$(CC) -c sledger.c -o sledger.o
 
 clean:
-	rm -f $(EXE)
-	rm *.o
+	rm -f $(EXE) *.o

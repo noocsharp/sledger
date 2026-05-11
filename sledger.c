@@ -325,7 +325,13 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	ret = decimal_parse(&val, buf, len);
 	if (ret < 0) {
-		fprintf(stderr, "%ld:%ld: invalid decimal\n", line, col);
+		switch (ret) {
+		case -2:
+			fprintf(stderr, "%ld:%ld: invalid decimal: overflow\n", line, col);
+			break;
+		default:
+			fprintf(stderr, "%ld:%ld: invalid decimal\n", line, col);
+		}
 		goto err1;
 	}
 
@@ -502,6 +508,7 @@ err1:
 	free(p->desc);
 	p->desc = NULL;
 err0:
+	if (lineptr != NULL) free(lineptr);
 	return -1;
 }
 
@@ -565,24 +572,24 @@ int posting_dup(struct posting *dst, const struct posting *src) {
 	dst->time = src->time;
 	dst->desc = strdup(src->desc);
 	if (dst->desc == NULL)
-		return -1;
+		goto err2;
 
 	for (int i = 0; i < arrlen(src->lines); i++) {
 		struct posting_line new_line = src->lines[i];
 		if (src->lines[i].account) {
 			new_line.account = strdup(src->lines[i].account);
-			// TODO: free things here?
 			if (new_line.account == NULL)
-				return -1;
+				goto err3;
 		} else {
 			new_line.account = NULL;
 		}
 
 		if (src->lines[i].currency) {
 			new_line.currency = strdup(src->lines[i].currency);
-			// TODO: free things here?
-			if (new_line.currency == NULL)
-				return -1;
+			if (new_line.currency == NULL) {
+				free(new_line.account);
+				goto err3;
+			}
 		} else {
 			new_line.currency = NULL;
 		}
@@ -593,4 +600,15 @@ int posting_dup(struct posting *dst, const struct posting *src) {
 	}
 
 	return 0;
+
+err3:
+	for (int i = 0; i < arrlen(dst->lines); i++) {
+		free(dst->lines[i].account);
+		free(dst->lines[i].currency);
+	}
+err2:
+	free(dst->desc);
+	arrfree(dst->lines);
+err1:
+	return -1;
 }

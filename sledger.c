@@ -119,7 +119,7 @@ int decimal_leq(struct decimal *_a, struct decimal *_b)
 void
 decimal_print(struct decimal *val, int minplaces)
 {
-	char buf[22];
+	char buf[44];
 	int len = 0;
 
 	long sig = val->sig;
@@ -158,18 +158,20 @@ ssize_t decimal_parse(struct decimal *out, const char *buf, size_t len) {
 	size_t startlen = len;
 
 	bool neg = false;
+
+	if (len == 0)
+		return -1;
+
 	if (*buf == '-') {
 		neg = true;
 		buf++;
 		len--;
-	}
-
-	if (*buf == '+') {
+	} else if (*buf == '+') {
 		buf++;
 		len--;
 	}
 
-	if (!isdigit(*buf) && *buf != '.') {
+	if (len == 0 || (!isdigit(*buf) && *buf != '.')) {
 		return -1;
 	}
 
@@ -351,6 +353,11 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	len -= ret;
 	col += ret;
 
+	if (len == 0) {
+		fprintf(stderr, "%ld:%ld: expected currency\n", line, col);
+		goto err1;
+	}
+
 	// TODO: handle non-ascii values
 
 	char *currency = buf;
@@ -432,6 +439,10 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	}
 
 	p->desc = strndup(buf, nl - buf);
+	if (p->desc == NULL) {
+		fprintf(stderr, "%ld:%ld: strndup failed\n", line, col);
+		goto err0;
+	}
 
 	len -= nl - buf + 1;
 	buf = nl + 1;
@@ -441,6 +452,7 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	struct posting_line pl = {0};
 	ssize_t read;
 	char *currency = NULL;
+	bool multicurrency = false;
 
 	char *lineptr = NULL;
 	size_t n = 0;
@@ -477,8 +489,15 @@ parse_posting(char *buf, size_t len, struct posting *p)
 
 		decimal_add(&total, &pl.val, &total);
 
-		if (pl.currency)
-			currency = pl.currency;
+		if (pl.currency) {
+			if (currency && strcmp(currency, pl.currency) != 0) {
+				multicurrency = true;
+				currency = NULL;
+			}
+
+			if (!multicurrency)
+				currency = pl.currency;
+		}
 
 		arrput(p->lines, pl);
 	}
@@ -493,11 +512,29 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		goto err1;
 	}
 
-	total.sig = -total.sig;
 	if (line_without_value_index != -1) {
+		if (multicurrency) {
+			fprintf(stderr, "%ld:%ld: cannot infer value in transaction with different currencies\n", line, col);
+			goto err1;
+		}
+
+		total.sig = -total.sig;
 		p->lines[line_without_value_index].val = total;
-		p->lines[line_without_value_index].currency = strdup(currency);
+		char *duped_currency = strdup(currency);
+		if (duped_currency == NULL) {
+			fprintf(stderr, "%ld:%ld: strdup failed\n", line, col);
+			goto err1;
+		}
+		p->lines[line_without_value_index].currency = duped_currency;
+	} else if (!multicurrency) {
+		if (total.sig != 0) {
+			fprintf(stderr, "%ld:%ld: transaction does not balance\n", line, col);
+			goto err1;
+		}
 	}
+
+	if (lineptr)
+		free(lineptr);
 
 	return 0;
 
@@ -508,7 +545,7 @@ err1:
 	free(p->desc);
 	p->desc = NULL;
 err0:
-	if (lineptr != NULL) free(lineptr);
+	if (lineptr) free(lineptr);
 	return -1;
 }
 
@@ -531,7 +568,6 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 
 		int ret = parse_posting(lineptr, read, &posting);
 		if (ret == -1) {
-			fprintf(stderr, "parsing failed\n");
 			goto error;
 		}
 

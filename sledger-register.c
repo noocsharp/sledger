@@ -65,6 +65,8 @@ void register_processor(struct posting *posting, void *data) {
 		}
 		putchar('\n');
 	}
+
+	shfree(posting_currency_amounts);
 }
 
 int main(int argc, char *argv[]) {

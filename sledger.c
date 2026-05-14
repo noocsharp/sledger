@@ -119,6 +119,8 @@ int decimal_leq(struct decimal *_a, struct decimal *_b)
 void
 decimal_print(struct decimal *val, int minplaces)
 {
+	assert(val->places <= 20);
+
 	char buf[44];
 	int len = 0;
 

@@ -402,19 +402,41 @@ bool isemptyline(char *lineptr, size_t n) {
 	return true;
 }
 
+void free_posting(struct posting *posting) {
+	if (posting->desc)
+		free(posting->desc);
+
+	posting->desc = NULL;
+
+	for (size_t i = 0; i < arrlen(posting->lines); i++) {
+		if (posting->lines[i].account) {
+			free(posting->lines[i].account);
+			posting->lines[i].account = NULL;
+		}
+
+		if (posting->lines[i].currency) {
+			free(posting->lines[i].currency);
+			posting->lines[i].currency = NULL;
+		}
+	}
+
+	arrfree(posting->lines);
+	posting->lines = NULL;
+}
+
 static int
 parse_posting(char *buf, size_t len, struct posting *p)
 {
 	char *linestart = buf;
 	if (len < strlen("0000-00-00")) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
-		goto err0;
+		goto err;
 	}
 
 	char *dateend = strptime(buf, "%Y-%m-%d", &p->time);
 	if (dateend == NULL) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
-		goto err0;
+		goto err;
 	}
 
 	len -= dateend - buf;
@@ -424,7 +446,7 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	int ret = eat_whitespace(buf, len, 1);
 	if (ret == -1) {
 		fprintf(stderr, "%ld:%ld: expected description for posting\n", line, col);
-		goto err0;
+		goto err;
 	}
 
 	buf += ret;
@@ -435,13 +457,13 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	if (nl == NULL) {
 		col += len;
 		fprintf(stderr, "%ld:%ld: expected newline after posting description\n", line, col);
-		goto err0;
+		goto err;
 	}
 
 	p->desc = strndup(buf, nl - buf);
 	if (p->desc == NULL) {
 		fprintf(stderr, "%ld:%ld: strndup failed\n", line, col);
-		goto err0;
+		goto err;
 	}
 
 	len -= nl - buf + 1;
@@ -476,14 +498,14 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		pl = (struct posting_line){0};
 		ssize_t used = parse_posting_line(lineptr, read, &pl);
 		if (used == -1)
-			goto err1;
+			goto err;
 
 		if (!pl.has_value) {
 			if (line_without_value_index == -1) {
 				line_without_value_index = arrlen(p->lines);
 			} else {
 				fprintf(stderr, "%ld:%ld: cannot have more than two lines in a posting without values\n", line, col);
-				goto err2;
+				goto err;
 			}
 		}
 
@@ -504,18 +526,18 @@ parse_posting(char *buf, size_t len, struct posting *p)
 
 	if (read == -1 && !feof(stdin)) {
 		fprintf(stderr, "%ld:%ld: getline read failed\n", line, col);
-		goto err1;
+		goto err;
 	}
 
 	if (arrlen(p->lines) < 2) {
 		fprintf(stderr, "%ld:%ld: expected at least 2 posting lines after posting description\n", line, col);
-		goto err1;
+		goto err;
 	}
 
 	if (line_without_value_index != -1) {
 		if (multicurrency) {
 			fprintf(stderr, "%ld:%ld: cannot infer value in transaction with different currencies\n", line, col);
-			goto err1;
+			goto err;
 		}
 
 		total.sig = -total.sig;
@@ -523,13 +545,13 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		char *duped_currency = strdup(currency);
 		if (duped_currency == NULL) {
 			fprintf(stderr, "%ld:%ld: strdup failed\n", line, col);
-			goto err1;
+			goto err;
 		}
 		p->lines[line_without_value_index].currency = duped_currency;
 	} else if (!multicurrency) {
 		if (total.sig != 0) {
 			fprintf(stderr, "%ld:%ld: transaction does not balance\n", line, col);
-			goto err1;
+			goto err;
 		}
 	}
 
@@ -538,13 +560,9 @@ parse_posting(char *buf, size_t len, struct posting *p)
 
 	return 0;
 
-err2:
-	free(pl.account);
-	if (pl.currency) free(pl.currency);
-err1:
-	free(p->desc);
-	p->desc = NULL;
-err0:
+err:
+	free_posting(p);
+
 	if (lineptr) free(lineptr);
 	return -1;
 }
@@ -573,13 +591,7 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 
 		processor(&posting, data);
 
-		if (posting.desc)
-			free(posting.desc);
-		for (size_t i = 0; i < arrlen(posting.lines); i++) {
-			if (posting.lines[i].account) free(posting.lines[i].account);
-			if (posting.lines[i].currency) free(posting.lines[i].currency);
-		}
-		arrfree(posting.lines);
+		free_posting(&posting);
 	}
 
 	if (lineptr) {
@@ -591,14 +603,6 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 		return 0;
 
 error:
-
-	if (posting.desc)
-		free(posting.desc);
-	for (size_t i = 0; i < arrlen(posting.lines); i++) {
-		if (posting.lines[i].account) free(posting.lines[i].account);
-		if (posting.lines[i].currency) free(posting.lines[i].currency);
-	}
-	arrfree(posting.lines);
 	if (lineptr)
 		free(lineptr);
 	return -1;
@@ -608,14 +612,14 @@ int posting_dup(struct posting *dst, const struct posting *src) {
 	dst->time = src->time;
 	dst->desc = strdup(src->desc);
 	if (dst->desc == NULL)
-		goto err2;
+		goto err;
 
 	for (int i = 0; i < arrlen(src->lines); i++) {
 		struct posting_line new_line = src->lines[i];
 		if (src->lines[i].account) {
 			new_line.account = strdup(src->lines[i].account);
 			if (new_line.account == NULL)
-				goto err3;
+				goto err;
 		} else {
 			new_line.account = NULL;
 		}
@@ -624,7 +628,7 @@ int posting_dup(struct posting *dst, const struct posting *src) {
 			new_line.currency = strdup(src->lines[i].currency);
 			if (new_line.currency == NULL) {
 				free(new_line.account);
-				goto err3;
+				goto err;
 			}
 		} else {
 			new_line.currency = NULL;
@@ -637,14 +641,7 @@ int posting_dup(struct posting *dst, const struct posting *src) {
 
 	return 0;
 
-err3:
-	for (int i = 0; i < arrlen(dst->lines); i++) {
-		free(dst->lines[i].account);
-		free(dst->lines[i].currency);
-	}
-err2:
-	free(dst->desc);
-	arrfree(dst->lines);
-err1:
+err:
+	free_posting(dst);
 	return -1;
 }

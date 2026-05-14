@@ -542,6 +542,8 @@ parse_posting(char *buf, size_t len, struct posting *p)
 
 		total.sig = -total.sig;
 		p->lines[line_without_value_index].val = total;
+
+		assert(currency);
 		char *duped_currency = strdup(currency);
 		if (duped_currency == NULL) {
 			fprintf(stderr, "%ld:%ld: strdup failed\n", line, col);

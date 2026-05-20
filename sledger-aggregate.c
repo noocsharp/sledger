@@ -28,12 +28,6 @@ struct period {
 // the keys of periods, but can be sorted later
 time_t *period_list = NULL;
 
-enum {
-	AGG_NONE = 0,
-	AGG_WEEKLY,
-	AGG_MONTHLY,
-	AGG_YEARLY
-} period = AGG_NONE;
 
 int timesort(const void *a, const void *b) {
 	time_t first = *((time_t *) a);
@@ -41,24 +35,47 @@ int timesort(const void *a, const void *b) {
 	return first - second;
 }
 
-void aggregate_monthly(struct posting *posting, void *data) {
-}
+enum {
+	PERIOD_NONE,
+	PERIOD_MONTHLY,
+	PERIOD_YEARLY
+};
 
-void aggregate_processor(struct posting *posting, void *data) {
+time_t bucket_monthly(struct posting *posting) {
 	struct tm date = posting->time;
 	date.tm_sec = date.tm_min = date.tm_hour = 0;
 	date.tm_mday = 1;
 
+	return mktime(&date);
+}
+
+time_t bucket_yearly(struct posting *posting) {
+	struct tm date = posting->time;
+	date.tm_sec = date.tm_min = date.tm_hour = 0;
+	date.tm_mday = 1;
+	date.tm_mon = 0;
+
+	return mktime(&date);
+}
+
+struct perioddata {
+	char *format;
+	time_t (*func)(struct posting *posting);
+} perioddata[] = {
+	[PERIOD_MONTHLY] = (struct perioddata){ "%B %Y", bucket_monthly },
+	[PERIOD_YEARLY] = (struct perioddata){ "%Y", bucket_yearly },
+};
+
+struct perioddata *periodptr;
+
+void aggregate_processor(struct posting *posting, void *data) {
 	time_t time;
-	if ((time = mktime(&date)) == -1) {
-		perror("mktime:");
+	if ((time = periodptr->func(posting)) < 0) {
 		return;
 	}
 
 	struct accountmap *accountmap = NULL;
 	if (hmgeti(periods, time) == -1) {
-		char datebuf[100];
-		strftime(datebuf, sizeof(datebuf), "%Y-%m-%d", &date);
 		hmput(periods, time, NULL);
 		arrput(period_list, time);
 	}
@@ -104,37 +121,34 @@ void aggregate_processor(struct posting *posting, void *data) {
 
 int main(int argc, char **argv) {
 	int opt;
-	while ((opt = getopt(argc, argv, "wmy")) != -1) {
+	while ((opt = getopt(argc, argv, "my")) != -1) {
 		switch (opt) {
-		case 'w':
-			if (period != AGG_NONE) {
-				fprintf(stderr, "-%c: period already provided", opt);
-				return 1;
-			}
-
-			period = AGG_WEEKLY;
-			break;
 		case 'm':
-			if (period != AGG_NONE) {
+			if (periodptr != NULL) {
 				fprintf(stderr, "-%c: period already provided", opt);
 				return 1;
 			}
 
-			period = AGG_MONTHLY;
+			periodptr = &perioddata[PERIOD_MONTHLY];
 			break;
 		case 'y':
-			if (period != AGG_NONE) {
+			if (periodptr != NULL) {
 				fprintf(stderr, "-%c: period already provided", opt);
 				return 1;
 			}
 
-			period = AGG_YEARLY;
+			periodptr = &perioddata[PERIOD_YEARLY];
 			break;
 		default:
 			fprintf(stderr, "-%c: invalid opt", opt);
 			return 1;
 
 		}
+	}
+
+	if (periodptr == NULL) {
+		fprintf(stderr, "%s: expected period argument\n", argv[0]);
+		return 1;
 	}
 
 	if (process_postings(aggregate_processor, NULL) == -1) {
@@ -148,7 +162,7 @@ int main(int argc, char **argv) {
 		struct tm time;
 		gmtime_r(&period_list[i], &time);
 		strftime(datebuf, sizeof(datebuf), "%Y-%m-%d", &time);
-		strftime(descbuf, sizeof(descbuf), "%B %Y", &time);
+		strftime(descbuf, sizeof(descbuf), periodptr->format, &time);
 		printf("%s %s\n", datebuf, descbuf);
 		struct accountmap *accounts = hmget(periods, period_list[i]);
 

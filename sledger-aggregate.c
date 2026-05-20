@@ -38,7 +38,8 @@ int timesort(const void *a, const void *b) {
 enum {
 	PERIOD_NONE,
 	PERIOD_MONTHLY,
-	PERIOD_YEARLY
+	PERIOD_YEARLY,
+	PERIOD_ALL
 };
 
 time_t bucket_monthly(struct posting *posting) {
@@ -58,19 +59,29 @@ time_t bucket_yearly(struct posting *posting) {
 	return mktime(&date);
 }
 
+time_t bucket_all(struct posting *posting) {
+	struct tm date = {};
+	date.tm_sec = date.tm_min = date.tm_hour = date.tm_mon = 0;
+	date.tm_mday = 1;
+	date.tm_year = -1900;
+
+	return mktime(&date);
+}
+
 struct perioddata {
 	char *format;
 	time_t (*func)(struct posting *posting);
 } perioddata[] = {
 	[PERIOD_MONTHLY] = (struct perioddata){ "%B %Y", bucket_monthly },
 	[PERIOD_YEARLY] = (struct perioddata){ "%Y", bucket_yearly },
+	[PERIOD_ALL] = (struct perioddata){ "All Time", bucket_all },
 };
 
 struct perioddata *periodptr;
 
 void aggregate_processor(struct posting *posting, void *data) {
 	time_t time;
-	if ((time = periodptr->func(posting)) < 0) {
+	if ((time = periodptr->func(posting)) == -1) {
 		return;
 	}
 
@@ -121,8 +132,16 @@ void aggregate_processor(struct posting *posting, void *data) {
 
 int main(int argc, char **argv) {
 	int opt;
-	while ((opt = getopt(argc, argv, "my")) != -1) {
+	while ((opt = getopt(argc, argv, "amy")) != -1) {
 		switch (opt) {
+		case 'a':
+			if (periodptr != NULL) {
+				fprintf(stderr, "-%c: period already provided", opt);
+				return 1;
+			}
+
+			periodptr = &perioddata[PERIOD_ALL];
+			break;
 		case 'm':
 			if (periodptr != NULL) {
 				fprintf(stderr, "-%c: period already provided", opt);

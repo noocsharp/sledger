@@ -230,12 +230,14 @@ int main(int argc, char **argv) {
 		struct accountmap *accounts = hmget(periods, period_list[i]);
 
 		for (int j = 0; j < shlen(accounts); j++) {
-
 			struct currencymap *currencies = accounts[j].value;
 			if (currencies == NULL)
 				continue;
 
 			for (int k = 0; k < shlen(currencies); k++) {
+				if (currencies[k].value.sig == 0)
+					continue;
+
 				printf("\t%s\t", accounts[j].key);
 				decimal_print(&currencies[k].value, 2);
 				printf(" %s\n", currencies[k].key);

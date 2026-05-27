@@ -20,7 +20,7 @@ void print_posting(struct posting *posting);
 int process_postings(void (*processor)(struct posting *posting, void *data), void *data);
 int decimal_mul(struct decimal *a, struct decimal *b, struct decimal *out);
 int decimal_add(struct decimal *a, struct decimal *b, struct decimal *out);
-int decimal_leq(struct decimal *a, struct decimal *b);
+int decimal_cmp(struct decimal *a, struct decimal *b);
 void decimal_abs(struct decimal *in, struct decimal *out);
 void decimal_print(struct decimal *val, int minplaces);
 int tmcmp(const struct posting *a, const struct posting *b);

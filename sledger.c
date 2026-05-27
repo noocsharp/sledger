@@ -90,7 +90,7 @@ void decimal_abs(struct decimal *in, struct decimal *out)
 	}
 }
 
-int decimal_leq(struct decimal *_a, struct decimal *_b)
+int decimal_cmp(struct decimal *_a, struct decimal *_b)
 {
 	decimal_reduce(_a);
 	decimal_reduce(_b);
@@ -107,13 +107,20 @@ int decimal_leq(struct decimal *_a, struct decimal *_b)
 	while (a.places < b.places) {
 		long new_sig = 10 * a.sig;
 		if (new_sig / 10 != a.sig) {
-			return -1;
+			return -2;
 		}
 		a.sig = new_sig;
 		a.places++;
 	}
 
-	return a.sig - b.sig;
+	long diff = a.sig - b.sig;
+	if (diff == 0) {
+		return 0;
+	} else if (diff > 0) {
+		return 1;
+	} else {
+		return -1;
+	}
 }
 
 void

@@ -31,7 +31,13 @@ int flowcmp(const struct posting *a, const struct posting *b) {
 		decimal_add(&db, &temp, &db);
 	}
 
-	return decimal_leq(&da, &db);
+	int ret = decimal_cmp(&da, &db);
+	if (ret == -2) {
+		fprintf(stderr, "decimal_cmp: failure\n");
+		exit(1);
+	}
+
+	return ret;
 }
 
 int (*cmp)(const struct posting *a, const struct posting *b) = NULL;

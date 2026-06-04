@@ -16,6 +16,7 @@
 #include "sledger.h"
 
 char **accounts;
+char *desc;
 struct tm begin = {.tm_year = -10000, .tm_mday = 1}, end = {.tm_year = 10000, .tm_mday = 1};
 
 void filter_processor(struct posting *posting, void *data) {
@@ -44,6 +45,10 @@ void filter_processor(struct posting *posting, void *data) {
 	if (tmcmp(&temp_posting, posting) < 0)
 		return;
 
+	if (desc && strstr(posting->desc, desc) == NULL) {
+		return;
+	}
+
 	print_posting(posting);
 }
 
@@ -61,6 +66,9 @@ int main(int argc, char *argv[]) {
 				fprintf(stderr, "-%c: invalid date\n", opt);
 				return 1;
 			}
+			break;
+		case 'd':
+			desc = optarg;
 			break;
 		case 'e':
 			dateend = strptime(optarg, "%Y-%m-%d", &end);

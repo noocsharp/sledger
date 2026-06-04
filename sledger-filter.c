@@ -15,18 +15,17 @@
 
 #include "sledger.h"
 
-char **account;
-struct tm begin, end;
-bool check_account, check_begin, check_end;
+char **accounts;
+struct tm begin = {.tm_year = -10000, .tm_mday = 1}, end = {.tm_year = 10000, .tm_mday = 1};
 
 void filter_processor(struct posting *posting, void *data) {
 	struct posting temp_posting;
 
-	if (check_account) {
+	if (accounts) {
 		bool found = false;
 		for (int i = 0; i < arrlen(posting->lines); i++) {
-			for (int j = 0; j < arrlen(account); j++) {
-				if (strncmp(account[j], posting->lines[i].account, strlen(account[j])) == 0) {
+			for (int j = 0; j < arrlen(accounts); j++) {
+				if (strncmp(accounts[j], posting->lines[i].account, strlen(accounts[j])) == 0) {
 					found = true;
 					break;
 				}
@@ -38,11 +37,11 @@ void filter_processor(struct posting *posting, void *data) {
 	}
 
 	temp_posting.time = begin;
-	if (check_begin && tmcmp(&temp_posting, posting) > 0)
+	if (tmcmp(&temp_posting, posting) > 0)
 		return;
 
 	temp_posting.time = end;
-	if (check_end && tmcmp(&temp_posting, posting) < 0)
+	if (tmcmp(&temp_posting, posting) < 0)
 		return;
 
 	print_posting(posting);
@@ -51,14 +50,12 @@ void filter_processor(struct posting *posting, void *data) {
 int main(int argc, char *argv[]) {
 	int opt;
 	char *dateend;
-	while ((opt = getopt(argc, argv, "a:b:e:")) != -1) {
+	while ((opt = getopt(argc, argv, "a:b:d:e:")) != -1) {
 		switch (opt) {
 		case 'a':
-			check_account = true;
-			arrput(account, optarg);
+			arrput(accounts, optarg);
 			break;
 		case 'b':
-			check_begin = true;
 			dateend = strptime(optarg, "%Y-%m-%d", &begin);
 			if (dateend == NULL || *dateend != 0) {
 				fprintf(stderr, "-%c: invalid date\n", opt);
@@ -66,7 +63,6 @@ int main(int argc, char *argv[]) {
 			}
 			break;
 		case 'e':
-			check_end = true;
 			dateend = strptime(optarg, "%Y-%m-%d", &end);
 			if (dateend == NULL || *dateend != 0) {
 				fprintf(stderr, "-%c: invalid date\n", opt);

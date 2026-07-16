@@ -61,13 +61,16 @@ void account_processor(struct posting *posting, void *data) {
 
 int main(int argc, char **argv) {
 	int opt;
-	while ((opt = getopt(argc, argv, "zc:")) != -1) {
+	while ((opt = getopt(argc, argv, "zc:d")) != -1) {
 		switch (opt) {
 		case 'z':
 			show_zero_accounts = true;
 			break;
 		case 'c':
 			shput(currencies, optarg, true);
+			break;
+		case 'd':
+			sl_balance_transactions = false;
 			break;
 		default:
 			fprintf(stderr, "-%c: invalid opt", opt);

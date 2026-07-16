@@ -16,6 +16,8 @@
 static unsigned long line, col;
 static int count = 0;
 
+bool sl_balance_transactions = true;
+
 static void
 decimal_reduce(struct decimal *a)
 {
@@ -560,7 +562,7 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		}
 		p->lines[line_without_value_index].currency = duped_currency;
 	} else if (!multicurrency) {
-		if (total.sig != 0) {
+		if (sl_balance_transactions && total.sig != 0) {
 			fprintf(stderr, "%ld:%ld: transaction does not balance\n", line, col);
 			goto err;
 		}

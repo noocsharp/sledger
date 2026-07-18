@@ -439,6 +439,7 @@ static int
 parse_posting(char *buf, size_t len, struct posting *p)
 {
 	char *linestart = buf;
+	char *lineptr = NULL;
 	if (len < strlen("0000-00-00")) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
 		goto err;
@@ -487,7 +488,6 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	char *currency = NULL;
 	bool multicurrency = false;
 
-	char *lineptr = NULL;
 	size_t n = 0;
 	while (1) {
 		char c;

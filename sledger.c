@@ -13,8 +13,10 @@
 #include "stb_ds.h"
 #include "sledger.h"
 
+#define EMPTY_CURRENCY_NAME "Empty_Curr"
+#define EMPTY_CURRENCY_LEN sizeof(EMPTY_CURRENCY_NAME) - 1
+
 static unsigned long line, col;
-static int count = 0;
 
 bool sl_balance_transactions = true;
 
@@ -256,7 +258,7 @@ print_posting(struct posting *posting)
 	printf("%04d-%02d-%02d %s\n", 1900 + posting->time.tm_year, posting->time.tm_mon + 1, posting->time.tm_mday, posting->desc);
 
 	for (int j = 0; j < arrlen(posting->lines); j++) {
-		printf("\t%s ", posting->lines[j].account);
+		printf("\t%s  ", posting->lines[j].account);
 		if (posting->lines[j].has_value) {
 			decimal_print(&posting->lines[j].val, 2);
 			printf("%s", posting->lines[j].currency);
@@ -268,21 +270,43 @@ print_posting(struct posting *posting)
 	putchar('\n');
 }
 
+static size_t currency_parse(char** currency, char* buf, size_t len)
+{
+	size_t currency_len = 0;
+	
+	*currency = buf;
+	while (len && isgraph(*buf) && !isdigit(*buf) && *buf != '+' && *buf != '-') {
+		currency_len++;
+		buf++;
+		len--;
+		col++;
+	}
+	
+	if (0 == currency_len) {
+		*currency = NULL;
+	}
+	return currency_len;
+}
+
 static int
 parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 {
 	if (len < 1)
 		return -1;
 
-	if (*buf != '\t') {
-		fprintf(stderr, "%ld:%ld: expected posting line to start with a tab\n", line, col);
+	if (*buf != '\t' && *buf != ' ') {
+		fprintf(stderr, "%ld:%ld: expected posting line to start with a tab or a space\n", line, col);
 		return -1;
 	}
 
 	buf++;
 	len--;
 	col++;
-
+	int ret = eat_whitespace(buf, len, 0);
+	if (ret != -1) {
+		buf += ret;
+		len -= ret;
+	}
 	char *account = buf;
 	size_t account_len = 0;
 
@@ -294,7 +318,8 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		col++;
 	}
 
-	while (len && (isalnum(*buf) || *buf == ':' || *buf == '_')) {
+
+	while (len && (isalnum(*buf) || *buf == ':' || *buf == '_' || (*buf == ' ' && buf[1] != ' '))) {
 		account_len++;
 		buf++;
 		len--;
@@ -315,14 +340,16 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		goto err1;
 	}
 
-	int ret = eat_whitespace(buf, len, 1);
+	ret = eat_whitespace(buf, len, 0);
 	if (ret != -1) {
 		buf += ret;
 		len -= ret;
 	}
 
 	// the case where the line's value should be inferred
-	if (*buf == '\n') {
+
+	
+if (*buf == '\n') {
 		buf++;
 		len--;
 		return 0;
@@ -333,6 +360,24 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	if (len == 0)
 		goto err1;
 
+	// Case of pre decimal currency like $-5
+	char *currency = NULL;
+	size_t currency_len = 0;
+	if (!isdigit(*buf) && *buf != '-' && *buf != '+') {
+		currency_len = currency_parse(&currency, buf, len);
+		if (0 == currency_len || NULL == currency) {
+			fprintf(stderr, "%ld:%ld: Wrong pre currency format\n", line, col);
+			goto err1;
+		}
+		buf += currency_len;
+		len -= currency_len;
+		ret = eat_whitespace(buf, len, 0);
+		if(-1 != ret)
+		{
+			buf += ret;
+			len -= ret;
+		}
+	}
 	// parse monetary value
 	struct decimal val = {0};
 
@@ -343,7 +388,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 			fprintf(stderr, "%ld:%ld: invalid decimal: overflow\n", line, col);
 			break;
 		default:
-			fprintf(stderr, "%ld:%ld: invalid decimal\n", line, col);
+			fprintf(stderr, "%ld:%ld: invalid decimal %d\n", line, col, *buf);
 		}
 		goto err1;
 	}
@@ -362,27 +407,30 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	ret = eat_whitespace(buf, len, 0);
 	buf += ret;
 	len -= ret;
-	col += ret;
 
-	if (len == 0) {
+	if (len == 0 && currency != NULL) {
 		fprintf(stderr, "%ld:%ld: expected currency\n", line, col);
 		goto err1;
+	} else if (currency == NULL) {
+		// TODO: handle non-ascii values
+		currency_len = currency_parse(&currency, buf, len);
+		if (0 == currency_len || NULL == currency) {
+			// Ledger supports empty currency we can go around this with naming the currency empty
+#ifdef STRICT_CURRENCY_NAMING
+			fprintf(stderr, "%ld:%ld: Wrong post currency format\n", line, col);
+			goto err1;
+#else
+			currency_len = EMPTY_CURRENCY_LEN;
+			currency = EMPTY_CURRENCY_NAME;
+#endif
+		}
+		else
+		{
+			buf += currency_len;
+			len -= currency_len;
+		}
 	}
 
-	// TODO: handle non-ascii values
-
-	char *currency = buf;
-	size_t currency_len = 0;
-	if (!isalpha(*buf)) {
-		fprintf(stderr, "%ld:%ld: expected first character of currency to be a letter\n", line, col);
-		goto err1;
-	}
-	while (len && (isalnum(*buf) || *buf == '_')) {
-		currency_len++;
-		buf++;
-		len--;
-		col++;
-	}
 
 	pl->currency = strndup(currency, currency_len);
 	if (pl->currency == NULL)
@@ -391,7 +439,6 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	ret = eat_whitespace(buf, len, 0);
 	buf += ret;
 	len -= ret;
-	col += ret;
 
 	// account for newline
 	buf++;
@@ -411,6 +458,19 @@ bool isemptyline(char *lineptr, size_t n) {
 	}
 
 	return true;
+}
+
+bool isfirstcharinline(char *lineptr, size_t n, char searched_char) {
+	int i = 0;
+	for (; i < n; i++) {
+		if (!isspace(lineptr[i]))
+			break;
+	}
+
+	if(lineptr[i] == searched_char)
+		return true;
+	
+	return false;
 }
 
 void free_posting(struct posting *posting) {
@@ -439,21 +499,35 @@ static int
 parse_posting(char *buf, size_t len, struct posting *p)
 {
 	char *linestart = buf;
-	if (len < strlen("0000-00-00")) {
+	size_t datelen = strlen("0000-00-00");
+	if (len < datelen) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
+		fprintf(stderr, "length of line %d is less than the supposed length\n", len);
 		goto err;
 	}
 
 	char *dateend = strptime(buf, "%Y-%m-%d", &p->time);
 	if (dateend == NULL) {
-		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
-		goto err;
+		dateend = strptime(buf, "%Y/%m/%d", &p->time);
+		if (dateend == NULL || (dateend - buf) != datelen ) {
+			fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
+			fprintf(stderr, "not correct date\n");
+			goto err;
+		}
 	}
 
 	len -= dateend - buf;
 	col += dateend - buf;
 	buf = dateend;
 
+	// Skip aux/secondary date if exists, Ledger feature, deprecated in hledger but kept for compatibility
+	if (len >= datelen+1 && *buf == '=')
+	{
+		len -= datelen + 1;
+		buf += datelen + 1;
+		col += datelen + 1;
+	}
+	
 	int ret = eat_whitespace(buf, len, 1);
 	if (ret == -1) {
 		fprintf(stderr, "%ld:%ld: expected description for posting\n", line, col);
@@ -462,7 +536,6 @@ parse_posting(char *buf, size_t len, struct posting *p)
 
 	buf += ret;
 	len -= ret;
-	col += ret;
 
 	char *nl = memchr(buf, '\n', len);
 	if (nl == NULL) {
@@ -505,6 +578,10 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		line++; col = 1;
 		if (isemptyline(lineptr, read))
 			break;
+
+		// Comment line
+		if(isfirstcharinline(lineptr, read, ';'))
+			continue;
 
 		pl = (struct posting_line){0};
 		ssize_t used = parse_posting_line(lineptr, read, &pl);
@@ -594,6 +671,14 @@ process_postings(void (*processor)(struct posting *posting, void *data), void *d
 		line++; col = 1;
 		if (isemptyline(lineptr, read))
 			continue;
+
+		// Comment line
+		// if(*lineptr == ';')
+		// 	continue;
+		if(isfirstcharinline(lineptr, read, ';'))
+			continue;
+
+		// Todo: Add directive skipping or support
 
 		posting = (struct posting){0};
 

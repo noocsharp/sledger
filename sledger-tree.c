@@ -77,8 +77,12 @@ void print_account_tree(struct account_tree *tree, int padding, int maxwidth) {
 void tree_processor(struct posting *posting, void *data) {
 	struct account_tree *account_tree = NULL;
 	for (int i = 0; i < arrlen(posting->lines); i++) {
-		//if (strncmp(posting->lines[i].account, account, strlen(account) < strlen(posting->lines[i].account) ? strlen(account) : strlen(posting->lines[i].account)))
+		if (account) {
+			if (strlen(account) <= strlen(posting->lines[i].account) && memcmp(posting->lines[i].account, account, strlen(account)) == 0)
+				add_account(&account_tree, posting->lines[i].account, posting->lines[i].val, posting->lines[i].currency);
+		} else {
 			add_account(&account_tree, posting->lines[i].account, posting->lines[i].val, posting->lines[i].currency);
+		}
 	}
 
 	printf("%04d-%02d-%02d %s\n", 1900 + posting->time.tm_year, posting->time.tm_mon + 1, posting->time.tm_mday, posting->desc);

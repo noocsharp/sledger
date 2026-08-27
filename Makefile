@@ -1,4 +1,4 @@
-EXE=sledger-accounts sledger-balance sledger-sort sledger-filter sledger-cashflow sledger-display sledger-register sledger-convert sledger-aggregate sledger-stats sledger-tree
+EXE=sledger-accounts sledger-balance sledger-sort sledger-filter sledger-cashflow sledger-register sledger-convert sledger-aggregate sledger-stats sledger-tree
 
 all: $(EXE)
 
@@ -19,9 +19,6 @@ sledger-filter: sledger-filter.o sledger.o
 
 sledger-cashflow: sledger-cashflow.o sledger.o
 	$(CC) sledger-cashflow.o sledger.o -o sledger-cashflow
-
-sledger-display: sledger-display.o sledger.o
-	$(CC) sledger-display.o sledger.o -o sledger-display
 
 sledger-tree: sledger-tree.o sledger.o
 	$(CC) sledger-tree.o sledger.o -o sledger-tree

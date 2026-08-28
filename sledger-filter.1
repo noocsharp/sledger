@@ -1,0 +1,28 @@
+.Dd $Mdocdate$
+.Dt sledger-filter 1
+.Os
+.Sh NAME
+.Nm sledger-filter
+.Nd filter postings
+.Sh SYNOPSIS
+.Nm
+.Op Fl a Ar account
+.Op Fl b Ar begin
+.Op Fl d Ar description
+.Op Fl e Ar end
+.Sh DESCRIPTION
+.Nm
+reads a journal from standard input and filters postings matching the given
+criteria
+.Bl -tag -width Ds
+.It Fl a Ar account
+Only including postings using account
+.It Fl b Ar begin
+Only including postings on and after the date begin, which is a date formatted YYYY-MM-DD
+.It Fl d Ar description
+Only including postings with a description containing the argument as a substring
+.It Fl e Ar end
+Only including postings on and before the date end, which is a date formatted YYYY-MM-DD
+.El
+.Sh AUTHORS
+.An Nihal Jere Aq Mt nihal@nihaljere.xyz

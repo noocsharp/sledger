@@ -1,0 +1,26 @@
+.Dd $Mdocdate$
+.Dt sledger-sort 1
+.Os
+.Sh NAME
+.Nm sledger-sort
+.Nd sort postings
+.Sh SYNOPSIS
+.Nm
+.Fl d
+.Op Fl i
+.Nm
+.Fl f
+.Op Fl i
+.Sh DESCRIPTION
+.Nm
+reads a journal from standard input and sorts postings by the given criteria
+.Bl -tag -width Ds
+.It Fl d
+Sorts postings by date (last to first)
+.It Fl f
+Sorts postings by the total amount (smallest to largest)
+.It Fl i
+Invert sorting criterion
+.El
+.Sh AUTHORS
+.An Nihal Jere Aq Mt nihal@nihaljere.xyz

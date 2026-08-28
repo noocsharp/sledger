@@ -1,0 +1,18 @@
+.Dd $Mdocdate$
+.Dt sledger-register 1
+.Os
+.Sh NAME
+.Nm sledger-register
+.Nd list transactions involving an account
+.Sh SYNOPSIS
+.Nm
+.Ar account
+.Sh DESCRIPTION
+.Nm
+reads a journal from standard input and displays each transaction associated with that account. It will output the date, description, change in value, and running total for each transaction.
+
+Usually you want to sort the transactions by date before running so they appear in the expected order. For example:
+.Dl sledger-sort -d < journal | sledger-register account
+.El
+.Sh AUTHORS
+.An Nihal Jere Aq Mt nihal@nihaljere.xyz

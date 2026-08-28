@@ -1,0 +1,32 @@
+.Dd $Mdocdate$
+.Dt sledger-aggregate 1
+.Os
+.Sh NAME
+.Nm sledger-aggregate
+.Nd aggregate postings by time range
+.Sh SYNOPSIS
+.Nm
+.Fl w
+.Nm
+.Fl m
+.Nm
+.Fl y
+.Nm
+.Fl a
+.Sh DESCRIPTION
+.Nm
+reads a journal from standard input and aggregates postings according to the
+specified time ranges. That is, it takes all of the postings in a given time
+period and combines them into one, adding together account values if necessary.
+.Bl -tag -width Ds
+.It Fl w
+Aggregate postings by week
+.It Fl m
+Aggregate postings by month
+.It Fl y
+Aggregate postings by year
+.It Fl a
+Aggregate all postings into one journal
+.El
+.Sh AUTHORS
+.An Nihal Jere Aq Mt nihal@nihaljere.xyz

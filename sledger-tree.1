@@ -1,0 +1,23 @@
+.Dd $Mdocdate$
+.Dt sledger-tree 1
+.Os
+.Sh NAME
+.Nm sledger-tree
+.Nd display accounts in posting as a tree
+.Sh SYNOPSIS
+.Nm
+.Op Fl a Ar account
+.Op Fl d
+.Sh DESCRIPTION
+.Nm
+reads a journal from standard input and rather than displaying a list of
+accounts and balances for each posting, displays a tree of accounts and
+balances, including total balances for non-leaf nodes in the tree.
+.Bl -tag -width Ds
+.It Fl a Ar account
+Pick account to filter
+.It Fl d
+Disable balancing
+.El
+.Sh AUTHORS
+.An Nihal Jere Aq Mt nihal@nihaljere.xyz

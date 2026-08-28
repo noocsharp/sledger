@@ -1,9 +1,13 @@
 EXE=sledger-accounts sledger-sort sledger-filter sledger-cashflow sledger-register sledger-convert sledger-aggregate sledger-stats sledger-tree
+MAN=sledger-accounts.1 sledger-sort.1 sledger-filter.1 sledger-register.1 sledger-aggregate.1 sledger-stats.1 sledger-tree.1
 
 all: $(EXE)
 
 install:
+	mkdir -p /usr/local/bin
 	cp $(EXE) /usr/local/bin
+	mkdir -p /usr/local/share/man/man1
+	cp $(MAN) /usr/local/share/man/man1
 
 sledger-accounts: sledger-accounts.o sledger.o
 	$(CC) sledger-accounts.o sledger.o -o sledger-accounts

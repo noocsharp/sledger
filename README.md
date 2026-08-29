@@ -14,7 +14,7 @@ The goals of sledger ordered by priority are the following:
 ## Examples
 
 Display a tree of all expenses this year, with the sums of each account within expenses:
-`sledger-filter -b 2025-01-01 < journal | sledger-balance | grep "^expenses" | sledger-display`
+`sledger-filter -b 2025-01-01 < journal | sledger-aggregate -a | sledger-tree -a expenses`
 
 Show all transactions involving an account with the value of the account after each transaction:
 `sledger-sort -d < journal | sledger-register account_name`

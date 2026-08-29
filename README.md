@@ -11,6 +11,14 @@ The goals of sledger ordered by priority are the following:
 4. Programs should only do things that cannot easily be done with existing command line tools
 5. Be fast
 
+## Limitations
+
+sledger currently uses a custom fixed-width floating point decimal
+implementation. It can represent any value where the significand can be stored
+in a C long, which is usually 64 bits (i.e. ±9,223,372,036,854,775,808). This is
+sufficient for my purposes, but if you require more, feel free to send a patch
+to either use long long, or implement arbitrary precision decimal arithmetic.
+
 ## Examples
 
 Display a tree of all expenses this year, with the sums of each account within expenses:

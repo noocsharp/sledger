@@ -19,10 +19,10 @@ int strcmp_keys(const void *a, const void *b) {
 	return strcmp(((struct account *)a)->key, ((struct account *)b)->key);
 }
 
-bool begin, end;
+bool begin, end, count;
 
 time_t target;
-int count;
+int posting_count;
 
 void account_processor(struct posting *posting, void *data) {
 	time_t posting_time = mktime(&posting->time);
@@ -42,7 +42,7 @@ void account_processor(struct posting *posting, void *data) {
 	}
 
 	if (count) {
-		count++;
+		posting_count++;
 	}
 }
 
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (count) {
-		printf("%d\n", count);
+		printf("%d\n", posting_count);
 	}
 
 	return 0;

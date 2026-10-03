@@ -168,7 +168,7 @@ void aggregate_processor(struct posting *posting, void *data) {
 
 int main(int argc, char **argv) {
 	int opt;
-	while ((opt = getopt(argc, argv, "amwy")) != -1) {
+	while ((opt = getopt(argc, argv, "admwy")) != -1) {
 		switch (opt) {
 		case 'a':
 			if (periodptr != NULL) {
@@ -177,6 +177,9 @@ int main(int argc, char **argv) {
 			}
 
 			periodptr = &perioddata[PERIOD_ALL];
+			break;
+		case 'd':
+			sl_balance_transactions = false;
 			break;
 		case 'w':
 			if (periodptr != NULL) {

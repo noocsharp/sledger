@@ -115,7 +115,7 @@ int decimal_cmp(struct decimal *_a, struct decimal *_b)
 		a.places++;
 	}
 
-	long diff = a.sig - b.sig;
+	long diff = (_a->places > _b->places) ? (b.sig - a.sig) : (a.sig - b.sig);
 	if (diff == 0) {
 		return 0;
 	} else if (diff > 0) {

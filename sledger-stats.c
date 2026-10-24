@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	if (begin || end) {
+	if ((begin || end) && (target != LONG_MAX && target != LONG_MIN)) {
 		struct tm *time = gmtime(&target);
 		char timestr[256];
 		strftime(timestr, sizeof(timestr), "%Y-%m-%d", time);

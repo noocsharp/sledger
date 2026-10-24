@@ -1,0 +1,41 @@
+.Dd $Mdocdate$
+.Dt sledger 5
+.Os
+.Sh NAME
+.Nm sledger
+.Nd sledger journal
+.Sh DESCRIPTION
+This is the file format used by sledger. It is intentionally minimal.
+
+A journal is a plaintext file consists of a sequence of postings. A posting
+is essentially one transaction. A posting begins with a line containing the
+date and description. The line begins with the date in YYYY-MM-DD format. The
+date is followed by whitespace. The first non-whitespace character after that
+starts the description, which takes the rest of the line.
+
+The remaining lines in a posting begin with a tab and specify the amounts
+being moved between accounts. After the tab is the name of the account. The
+account name music start with a letter, but the rest of it can contain
+alphanumeric characters along with a colon or an underscore. The colon is
+used as a delimiter to allow placing accounts into a hierarchy. After the
+account comes some more whitespace, followed by a decimal number, some more
+whitespace, and the unit name. The unit name must start with a letter, but
+the rest can be an alphanumeric character or an underscore.
+
+Optionally, one of these lines can be blank and its value inferred by adding
+up the rest of the lines in the transaction. This only works if all values in
+the transaction are of the same unit.
+
+.Sh EXAMPLE
+.Bd -literal
+2026-05-03 Groceries
+	expenses:groceries	-43.35 USD
+	liabilities:cc	43.35 USD
+
+2026-06-15 2x8GB of DDR4 RAM
+	expenses:ram	-50,003.38 USD
+	liabilities:cc
+.Ed
+
+.Sh AUTHORS
+.An Nihal Jere Aq Mt nihal@nihaljere.xyz

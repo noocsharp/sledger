@@ -1,5 +1,5 @@
 EXE=sledger-accounts sledger-sort sledger-filter sledger-cashflow sledger-register sledger-convert sledger-aggregate sledger-stats sledger-tree
-MAN=sledger-accounts.1 sledger-sort.1 sledger-filter.1 sledger-register.1 sledger-aggregate.1 sledger-stats.1 sledger-tree.1
+MAN=sledger-accounts.1 sledger-sort.1 sledger-filter.1 sledger-register.1 sledger-aggregate.1 sledger-stats.1 sledger-tree.1 sledger.5
 
 all: $(EXE)
 

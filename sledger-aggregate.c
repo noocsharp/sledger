@@ -50,12 +50,12 @@ time_t bucket_weekly(struct posting *posting) {
 	date.tm_mday = 1;
 
 	struct tm jan4 = {.tm_mday = 4, .tm_mon = 0, .tm_year = date.tm_year};
-	mktime(&jan4);
+	timegm(&jan4);
 	int doy_for_week = week * 7 - (jan4.tm_wday + 3);
 
 	struct tm tm_for_week = {.tm_mday = 1 + doy_for_week, .tm_mon = 0, .tm_year = date.tm_year};
 
-	return mktime(&tm_for_week);
+	return timegm(&tm_for_week);
 }
 
 void desc_weekly(char *buf, size_t size, struct tm *time) {
@@ -70,7 +70,7 @@ time_t bucket_monthly(struct posting *posting) {
 	date.tm_sec = date.tm_min = date.tm_hour = 0;
 	date.tm_mday = 1;
 
-	return mktime(&date);
+	return timegm(&date);
 }
 
 void desc_monthly(char *buf, size_t size, struct tm *time) {
@@ -83,7 +83,7 @@ time_t bucket_yearly(struct posting *posting) {
 	date.tm_mday = 1;
 	date.tm_mon = 0;
 
-	return mktime(&date);
+	return timegm(&date);
 }
 
 void desc_yearly(char *buf, size_t size, struct tm *time) {
@@ -96,7 +96,7 @@ time_t bucket_all(struct posting *posting) {
 	date.tm_mday = 1;
 	date.tm_year = -1900;
 
-	return mktime(&date);
+	return timegm(&date);
 }
 
 void desc_all(char *buf, size_t size, struct tm *time) {

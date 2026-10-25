@@ -1,14 +1,9 @@
-#define _XOPEN_SOURCE /* strptime */
+#define _XOPEN_SOURCE 500 /* strdup */
 
-#include <assert.h>
-#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/types.h>
 
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"

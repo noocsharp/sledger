@@ -1,12 +1,7 @@
-#include <assert.h>
-#include <ctype.h>
-#include <stdbool.h>
+#define _XOPEN_SOURCE /* getopt */
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/types.h>
 
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
@@ -21,7 +16,7 @@ struct conversion {
 
 void convert_processor(struct posting *posting, void *data) {
 	(void)data;
-	struct posting dup = {};
+	struct posting dup = {0};
 	posting_dup(&dup, posting);
 
 	for (int i = 0; i < arrlen(posting->lines); i++) {
@@ -59,9 +54,8 @@ int main(int argc, char *argv[]) {
 			shputs(conversions, conversion);
 			conversion.key = NULL;
 			conversion.value = NULL;
-			conversion.amount = (struct decimal){};
+			conversion.amount = (struct decimal){0};
 			break;
-		default:
 		}
 	}
 

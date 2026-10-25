@@ -1,12 +1,8 @@
-#include <assert.h>
-#include <ctype.h>
+#define _XOPEN_SOURCE
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/types.h>
 
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
@@ -18,7 +14,7 @@ struct posting *postings;
 int flowcmp(const void *_a, const void *_b) {
 	struct posting *a = (struct posting *) _a;
 	struct posting *b = (struct posting *) _b;
-	struct decimal da = {}, db = {};
+	struct decimal da = {0}, db = {0};
 
 	struct decimal temp;
 	for (int i = 0; i < arrlen(a->lines); i++) {
@@ -44,7 +40,7 @@ int (*cmp)(const void *a, const void *b) = NULL;
 
 void sort_processor(struct posting *posting, void *data) {
 	(void)data;
-	struct posting copy = {};
+	struct posting copy = {0};
 	if (posting_dup(&copy, posting) != 0) {
 		fprintf(stderr, "posting_dup: failure\n");
 		exit(1);
@@ -66,7 +62,6 @@ int main(int argc, char *argv[]) {
 		case 'f':
 			cmp = flowcmp;
 			break;
-		default:
 		}
 	}
 

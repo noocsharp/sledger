@@ -4,10 +4,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdio.h>
-#include <string.h>
-#include <sys/types.h>
 #include <time.h>
 
 #include "stb_ds.h"

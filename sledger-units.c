@@ -1,11 +1,6 @@
-#include <assert.h>
-#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <time.h>
-#include <unistd.h>
 
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
@@ -20,6 +15,7 @@ struct unit_info {
 } *units;
 
 void unit_processor(struct posting *posting, void *data) {
+	(void)data;
 	for (int i = 0; i < arrlen(posting->lines); i++) {
 		char *dup = strdup(posting->lines[i].currency);
 		assert(dup);
@@ -27,13 +23,13 @@ void unit_processor(struct posting *posting, void *data) {
 	}
 }
 
-int main(int argc, char **argv) {
+int main() {
 
 	if (process_postings(unit_processor, NULL) == -1) {
 		return 1;
 	}
 
-	for (int i = 0; i < shlenu(units); i++) {
+	for (int i = 0; i < shlen(units); i++) {
 		printf("%s\n", units[i].key);
 	}
 

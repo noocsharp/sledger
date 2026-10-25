@@ -1,4 +1,5 @@
-#define _XOPEN_SOURCE
+#define _DEFAULT_SOURCE /* timegm */
+#include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
@@ -92,7 +93,7 @@ void desc_yearly(char *buf, size_t size, struct tm *time) {
 
 time_t bucket_all(struct posting *posting) {
 	(void)posting;
-	struct tm date = {};
+	struct tm date = {0};
 	date.tm_sec = date.tm_min = date.tm_hour = date.tm_mon = 0;
 	date.tm_mday = 1;
 	date.tm_year = -1900;
@@ -147,7 +148,7 @@ void aggregate_processor(struct posting *posting, void *data) {
 		}
 
 		currencymap = shget(accountmap, account);
-		struct decimal val = {};
+		struct decimal val = {0};
 		char *currency = NULL;
 		if (shgeti(currencymap, posting->lines[i].currency) == -1) {
 			currency = strdup(posting->lines[i].currency);

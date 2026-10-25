@@ -1,14 +1,8 @@
 #define _XOPEN_SOURCE /* strptime */
-
-#include <assert.h>
-#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/types.h>
 
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
@@ -78,7 +72,6 @@ int main(int argc, char *argv[]) {
 				return 1;
 			}
 			break;
-		default:
 		}
 	}
 

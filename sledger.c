@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
@@ -29,15 +30,19 @@ decimal_mul(struct decimal *_a, struct decimal *_b, struct decimal *out)
 	decimal_reduce(_a);
 	decimal_reduce(_b);
 
-	long product = _a->sig * _b->sig;
-	if ((_a->sig < 0 && _b->sig < 0 && product < 0) ||
-		(_a->sig > 0 && _b->sig > 0 && product < 0) ||
-		(_a->sig < 0 && _b->sig > 0 && product > 0) ||
-		(_a->sig > 0 && _b->sig < 0 && product > 0))
+	if ((_a->sig < 0 && _b->sig < 0 && LONG_MAX / _a->sig > _b->sig) ||
+		(_a->sig > 0 && _b->sig > 0 && LONG_MAX / _a->sig < _b->sig) ||
+		(_a->sig < 0 && _b->sig > 0 && LONG_MIN / _b->sig > _a->sig) ||
+		(_a->sig > 0 && _b->sig < 0 && LONG_MIN / _a->sig > _b->sig))
 		return -1;
 
+	if (UINT_MAX - _a->places < _b->places)
+		return -1;
+
+	long product = _a->sig * _b->sig;
+
 	out->sig = product;
-	out->places = _a->places + _b->places; /* TODO: overflow? */
+	out->places = _a->places + _b->places;
 
 	decimal_reduce(out);
 
@@ -60,21 +65,21 @@ decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
 	}
 
 	while (a.places < b.places) {
-		long new_sig = 10 * a.sig;
-		if (new_sig / 10 != a.sig) {
+		if (a.sig > LONG_MAX / 10 || a.sig < LONG_MIN / 10) {
 			return -1;
 		}
-		a.sig = new_sig;
+		a.sig *= 10;
 		a.places++;
 	}
 
-	long sum = a.sig + b.sig;
-	if ((a.sig < 0 && b.sig < 0 && sum > 0) ||
-		(a.sig > 0 && b.sig > 0 && sum < 0))
+	if ((a.sig < 0 && b.sig < LONG_MIN - a.sig) ||
+		(a.sig > 0 && b.sig > LONG_MAX - a.sig))
 		return -1;
 
-	out->sig = sum;
+	out->sig = a.sig + b.sig;
 	out->places = b.places;
+
+	decimal_reduce(out);
 
 	return 0;
 }

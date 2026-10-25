@@ -23,7 +23,10 @@ void convert_processor(struct posting *posting, void *data) {
 		struct conversion *conversion = shgetp_null(conversions, posting->lines[i].currency);
 		if (conversion) {
 			dup.lines[i].currency = conversion->value;
-			decimal_mul(&posting->lines[i].val, &conversion->amount, &dup.lines[i].val);
+			if (decimal_mul(&posting->lines[i].val, &conversion->amount, &dup.lines[i].val) == -1) {
+				fprintf(stderr, "decimal_mul: overflow\n");
+				exit(1);
+			};
 		}
 	}
 

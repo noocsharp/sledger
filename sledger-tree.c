@@ -25,7 +25,7 @@ struct account_tree {
 	struct amount *amount;
 };
 
-int add_account(struct account_tree **account_tree, char *account, struct decimal value, char *currency) {
+void add_account(struct account_tree **account_tree, char *account, struct decimal value, char *currency) {
 	char *tokaccount = strdup(account);
 	assert(tokaccount);
 	char *saveptr;
@@ -53,7 +53,7 @@ int add_account(struct account_tree **account_tree, char *account, struct decima
 }
 
 void print_account_tree(struct account_tree *tree, int padding, int maxwidth) {
-	for (int i = 0; i < shlenu(tree); i++) {
+	for (int i = 0; i < shlen(tree); i++) {
 		for (int j = 0; j < padding; j++) {
 			putchar(' ');
 		}
@@ -64,7 +64,7 @@ void print_account_tree(struct account_tree *tree, int padding, int maxwidth) {
 				putchar(' ');
 			}
 
-			for (int j = 0; j < shlenu(tree[i].amount); j++) {
+			for (int j = 0; j < shlen(tree[i].amount); j++) {
 				decimal_print(&tree[i].amount[j].value, 2);
 				printf(" %s\t", tree[i].amount[j].key);
 			}
@@ -75,6 +75,7 @@ void print_account_tree(struct account_tree *tree, int padding, int maxwidth) {
 }
 
 void tree_processor(struct posting *posting, void *data) {
+	(void)data;
 	struct account_tree *account_tree = NULL;
 	for (int i = 0; i < arrlen(posting->lines); i++) {
 		if (account) {
@@ -106,7 +107,5 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	int ret = process_postings(tree_processor, NULL);
-
-	return 0;
+	return -process_postings(tree_processor, NULL);
 }

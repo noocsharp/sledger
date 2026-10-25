@@ -24,7 +24,7 @@ struct currency_amounts {
 } *currency_amounts;
 
 void register_processor(struct posting *posting, void *data) {
-	struct posting temp_posting;
+	(void)data;
 
 	struct currency_amounts *posting_currency_amounts = NULL;
 	for (int i = 0; i < arrlen(posting->lines); i++) {
@@ -52,7 +52,6 @@ void register_processor(struct posting *posting, void *data) {
 	}
 
 	if (shlen(posting_currency_amounts) != 0) {
-		char buf[16];
 		printf("%04d-%02d-%02d %s\t", 1900 + posting->time.tm_year, posting->time.tm_mon + 1, posting->time.tm_mday, posting->desc);
 		for (int i = 0; i < shlen(posting_currency_amounts); i++) {
 			decimal_print(&posting_currency_amounts[i].value, 2);

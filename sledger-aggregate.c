@@ -91,6 +91,7 @@ void desc_yearly(char *buf, size_t size, struct tm *time) {
 }
 
 time_t bucket_all(struct posting *posting) {
+	(void)posting;
 	struct tm date = {};
 	date.tm_sec = date.tm_min = date.tm_hour = date.tm_mon = 0;
 	date.tm_mday = 1;
@@ -100,6 +101,7 @@ time_t bucket_all(struct posting *posting) {
 }
 
 void desc_all(char *buf, size_t size, struct tm *time) {
+	(void)time;
 	strncpy(buf, "All Time", size);
 }
 
@@ -107,15 +109,16 @@ struct perioddata {
 	void (*format)(char *buf, size_t size, struct tm *time);
 	time_t (*func)(struct posting *posting);
 } perioddata[] = {
-	[PERIOD_WEEKLY] = (struct perioddata){ desc_weekly, bucket_weekly },
-	[PERIOD_MONTHLY] = (struct perioddata){ desc_monthly, bucket_monthly },
-	[PERIOD_YEARLY] = (struct perioddata){ desc_yearly, bucket_yearly },
-	[PERIOD_ALL] = (struct perioddata){ desc_all, bucket_all },
+	[PERIOD_WEEKLY] = { desc_weekly, bucket_weekly },
+	[PERIOD_MONTHLY] = { desc_monthly, bucket_monthly },
+	[PERIOD_YEARLY] = { desc_yearly, bucket_yearly },
+	[PERIOD_ALL] = { desc_all, bucket_all },
 };
 
 struct perioddata *periodptr;
 
 void aggregate_processor(struct posting *posting, void *data) {
+	(void)data;
 	time_t time;
 	if ((time = periodptr->func(posting)) == -1) {
 		return;

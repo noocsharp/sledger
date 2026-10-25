@@ -20,6 +20,7 @@ struct conversion {
 } *conversions;
 
 void convert_processor(struct posting *posting, void *data) {
+	(void)data;
 	struct posting dup = {};
 	posting_dup(&dup, posting);
 
@@ -38,7 +39,6 @@ char *from, to;
 struct decimal amount;
 int main(int argc, char *argv[]) {
 	int opt;
-	char *dateend;
 	struct conversion conversion = {0};
 	while ((opt = getopt(argc, argv, "a:f:t:")) != -1) {
 		switch (opt) {

@@ -43,6 +43,7 @@ int flowcmp(const struct posting *a, const struct posting *b) {
 int (*cmp)(const struct posting *a, const struct posting *b) = NULL;
 
 void sort_processor(struct posting *posting, void *data) {
+	(void)data;
 	int left = 0;
 	int right = arrlen(sorted_postings) - 1;
 	int mid;

@@ -25,6 +25,7 @@ time_t target;
 int posting_count;
 
 void account_processor(struct posting *posting, void *data) {
+	(void)data;
 	time_t posting_time = timegm(&posting->time);
 	if (posting_time == (time_t) -1) {
 		fprintf(stderr, "invalid time\n");

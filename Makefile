@@ -1,6 +1,8 @@
 EXE=sledger-accounts sledger-sort sledger-filter sledger-cashflow sledger-register sledger-convert sledger-aggregate sledger-stats sledger-tree
 MAN=sledger-accounts.1 sledger-sort.1 sledger-filter.1 sledger-register.1 sledger-aggregate.1 sledger-stats.1 sledger-tree.1 sledger.5
 
+CFLAGS = -Wall -Wextra -pedantic -O2
+
 all: $(EXE)
 
 install:
@@ -40,37 +42,37 @@ sledger-stats: sledger-stats.o sledger.o
 	$(CC) sledger-stats.o sledger.o -o sledger-stats
 
 sledger-accounts.o: sledger-accounts.c
-	$(CC) -c sledger-accounts.c -o sledger-accounts.o
+	$(CC) $(CFLAGS) -c sledger-accounts.c -o sledger-accounts.o
 
 sledger-sort.o: sledger-sort.c
-	$(CC) -c sledger-sort.c -o sledger-sort.o
+	$(CC) $(CFLAGS) -c sledger-sort.c -o sledger-sort.o
 
 sledger-filter.o: sledger-filter.c
-	$(CC) -c sledger-filter.c -o sledger-filter.o
+	$(CC) $(CFLAGS) -c sledger-filter.c -o sledger-filter.o
 
 sledger-cashflow.o: sledger-cashflow.c
-	$(CC) -c sledger-cashflow.c -o sledger-cashflow.o
+	$(CC) $(CFLAGS) -c sledger-cashflow.c -o sledger-cashflow.o
 
 sledger-tree.o: sledger-tree.c
-	$(CC) -c sledger-tree.c -o sledger-tree.o
+	$(CC) $(CFLAGS) -c sledger-tree.c -o sledger-tree.o
 
 sledger-register.o: sledger-register.c
-	$(CC) -c sledger-register.c -o sledger-register.o
+	$(CC) $(CFLAGS) -c sledger-register.c -o sledger-register.o
 
 sledger-convert.o: sledger-convert.c
-	$(CC) -c sledger-convert.c -o sledger-convert.o
+	$(CC) $(CFLAGS) -c sledger-convert.c -o sledger-convert.o
 
 sledger-units.o: sledger-units.c
-	$(CC) -c sledger-units.c -o sledger-units.o
+	$(CC) $(CFLAGS) -c sledger-units.c -o sledger-units.o
 
 sledger-aggregate.o: sledger-aggregate.c
-	$(CC) -c sledger-aggregate.c -o sledger-aggregate.o
+	$(CC) $(CFLAGS) -c sledger-aggregate.c -o sledger-aggregate.o
 
 sledger-stats.o: sledger-stats.c
-	$(CC) -c sledger-stats.c -o sledger-stats.o
+	$(CC) $(CFLAGS) -c sledger-stats.c -o sledger-stats.o
 
 sledger.o: sledger.c
-	$(CC) -c sledger.c -o sledger.o
+	$(CC) $(CFLAGS) -c sledger.c -o sledger.o
 
 clean:
 	rm -f $(EXE) *.o

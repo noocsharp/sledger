@@ -20,6 +20,7 @@ char *desc;
 struct tm begin = {.tm_year = -10000, .tm_mday = 1}, end = {.tm_year = 10000, .tm_mday = 1};
 
 void filter_processor(struct posting *posting, void *data) {
+	(void)data;
 	struct posting temp_posting;
 
 	if (accounts) {

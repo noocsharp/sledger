@@ -14,7 +14,6 @@
 #include "sledger.h"
 
 static unsigned long line, col;
-static int count = 0;
 
 bool sl_balance_transactions = true;
 
@@ -34,10 +33,10 @@ decimal_mul(struct decimal *_a, struct decimal *_b, struct decimal *out)
 	decimal_reduce(_b);
 
 	long product = _a->sig * _b->sig;
-	if (_a->sig < 0 && _b->sig < 0 && product < 0 ||
-		_a->sig > 0 && _b->sig > 0 && product < 0 ||
-		_a->sig < 0 && _b->sig > 0 && product > 0 ||
-		_a->sig > 0 && _b->sig < 0 && product > 0)
+	if ((_a->sig < 0 && _b->sig < 0 && product < 0) ||
+		(_a->sig > 0 && _b->sig > 0 && product < 0) ||
+		(_a->sig < 0 && _b->sig > 0 && product > 0) ||
+		(_a->sig > 0 && _b->sig < 0 && product > 0))
 		return -1;
 
 	out->sig = product;
@@ -73,8 +72,8 @@ decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
 	}
 
 	long sum = a.sig + b.sig;
-	if (a.sig < 0 && b.sig < 0 && sum > 0 ||
-		a.sig > 0 && b.sig > 0 && sum < 0)
+	if ((a.sig < 0 && b.sig < 0 && sum > 0) ||
+		(a.sig > 0 && b.sig > 0 && sum < 0))
 		return -1;
 
 	out->sig = sum;
@@ -404,7 +403,7 @@ err1:
 	return -1;
 }
 
-bool isemptyline(char *lineptr, size_t n) {
+bool isemptyline(char *lineptr, int n) {
 	for (int i = 0; i < n; i++) {
 		if (!isspace(lineptr[i]))
 			return false;
@@ -419,7 +418,7 @@ void free_posting(struct posting *posting) {
 
 	posting->desc = NULL;
 
-	for (size_t i = 0; i < arrlen(posting->lines); i++) {
+	for (int i = 0; i < arrlen(posting->lines); i++) {
 		if (posting->lines[i].account) {
 			free(posting->lines[i].account);
 			posting->lines[i].account = NULL;
@@ -438,7 +437,6 @@ void free_posting(struct posting *posting) {
 static int
 parse_posting(char *buf, size_t len, struct posting *p)
 {
-	char *linestart = buf;
 	char *lineptr = NULL;
 	if (len < strlen("0000-00-00")) {
 		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);

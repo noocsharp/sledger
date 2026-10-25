@@ -23,6 +23,7 @@ int strcmp_keys(const void *a, const void *b) {
 }
 
 void account_processor(struct posting *posting, void *data) {
+	(void)data;
 	for (int i = 0; i < arrlen(posting->lines); i++) {
 		char *account_str = strdup(posting->lines[i].account);
 		assert(account_str);

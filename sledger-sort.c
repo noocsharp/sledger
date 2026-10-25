@@ -13,11 +13,11 @@
 
 #include "sledger.h"
 
-struct posting *sorted_postings;
+struct posting *postings;
 
-int factor = 1;
-
-int flowcmp(const struct posting *a, const struct posting *b) {
+int flowcmp(const void *_a, const void *_b) {
+	struct posting *a = (struct posting *) _a;
+	struct posting *b = (struct posting *) _b;
 	struct decimal da = {}, db = {};
 
 	struct decimal temp;
@@ -40,34 +40,25 @@ int flowcmp(const struct posting *a, const struct posting *b) {
 	return ret;
 }
 
-int (*cmp)(const struct posting *a, const struct posting *b) = NULL;
+int (*cmp)(const void *a, const void *b) = NULL;
 
 void sort_processor(struct posting *posting, void *data) {
 	(void)data;
-	int left = 0;
-	int right = arrlen(sorted_postings) - 1;
-	int mid;
-
-	while (left <= right) {
-		mid = left + (right - left) / 2;
-
-		if (factor * cmp(posting, &sorted_postings[mid]) < 0) {
-			right = mid - 1;
-		} else {
-			left = mid + 1;
-		}
+	struct posting copy = {};
+	if (posting_dup(&copy, posting) != 0) {
+		fprintf(stderr, "posting_dup: failure\n");
+		exit(1);
 	}
-
-	arrins(sorted_postings, left, (struct posting){});
-	assert(posting_dup(sorted_postings + left, posting) >= 0);
+	arrput(postings, copy);
 }
 
 int main(int argc, char *argv[]) {
 	int opt;
+	bool invert = false;
 	while ((opt = getopt(argc, argv, "dfi")) != -1) {
 		switch (opt) {
 		case 'i':
-			factor = -1;
+			invert = true;
 			break;
 		case 'd':
 			cmp = tmcmp;
@@ -86,9 +77,18 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	for (int i = 0; i < arrlen(sorted_postings); i++) {
-		struct posting *posting = sorted_postings + i;
-		print_posting(posting);
+	qsort(postings, arrlen(postings), sizeof(*postings), cmp);
+
+	if (invert) {
+		for (int i = arrlen(postings) - 1; i >= 0; i--) {
+			struct posting *posting = postings + i;
+			print_posting(posting);
+		}
+	} else {
+		for (int i = 0; i < arrlen(postings); i++) {
+			struct posting *posting = postings + i;
+			print_posting(posting);
+		}
 	}
 
 	return 0;

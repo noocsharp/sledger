@@ -223,7 +223,9 @@ ssize_t decimal_parse(struct decimal *out, const char *buf, size_t len) {
 	return startlen - len;
 }
 
-int tmcmp(const struct posting *a, const struct posting *b) {
+int tmcmp(const void *_a, const void *_b) {
+	struct posting *a = (struct posting *) _a;
+	struct posting *b = (struct posting *) _b;
 	if (a->time.tm_year != b->time.tm_year) return a->time.tm_year - b->time.tm_year;
 	if (a->time.tm_mon != b->time.tm_mon) return a->time.tm_mon - b->time.tm_mon;
 	return a->time.tm_mday - b->time.tm_mday;

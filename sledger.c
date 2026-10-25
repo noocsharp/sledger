@@ -517,7 +517,10 @@ parse_posting(char *buf, size_t len, struct posting *p)
 			}
 		}
 
-		decimal_add(&total, &pl.val, &total);
+		if (decimal_add(&total, &pl.val, &total) == -1) {
+			fprintf(stderr, "%ld:%ld: decimal_add overflow\n", line, col);
+			goto err;
+		}
 
 		if (pl.currency) {
 			if (currency && strcmp(currency, pl.currency) != 0) {

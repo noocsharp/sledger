@@ -31,7 +31,10 @@ void register_processor(struct posting *posting, void *data) {
 				entry = shgetp(posting_currency_amounts, posting->lines[i].currency);
 			}
 
-			decimal_add(&entry->value, &posting->lines[i].val, &entry->value);
+			if (decimal_add(&entry->value, &posting->lines[i].val, &entry->value) == -1) {
+				fprintf(stderr, "decimal_add: overflow\n");
+				exit(1);
+			}
 
 			// for global
 			entry = shgetp_null(currency_amounts, posting->lines[i].currency);
@@ -42,7 +45,10 @@ void register_processor(struct posting *posting, void *data) {
 				entry = shgetp(currency_amounts, posting->lines[i].currency);
 			}
 
-			decimal_add(&entry->value, &posting->lines[i].val, &entry->value);
+			if (decimal_add(&entry->value, &posting->lines[i].val, &entry->value) == -1) {
+				fprintf(stderr, "decimal_add: overflow\n");
+				exit(1);
+			}
 		}
 	}
 

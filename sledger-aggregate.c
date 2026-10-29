@@ -33,7 +33,15 @@ time_t *period_list = NULL;
 int timesort(const void *a, const void *b) {
 	time_t first = *((time_t *) a);
 	time_t second = *((time_t *) b);
-	return first - second;
+	if (first < second) {
+		return 1;
+	}
+
+	if (first > second) {
+		return -1;
+	}
+
+	return 0;
 }
 
 enum {
@@ -162,7 +170,10 @@ void aggregate_processor(struct posting *posting, void *data) {
 			val = shget(currencymap, posting->lines[i].currency);
 		}
 
-		decimal_add(&val, &posting->lines[i].val, &val);
+		if (decimal_add(&val, &posting->lines[i].val, &val) != 0) {
+			fprintf(stderr, "decimal_add: failure\n");
+			exit(1);
+		}
 		shput(currencymap, currency, val);
 		shput(accountmap, account, currencymap);
 	}

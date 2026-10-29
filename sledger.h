@@ -21,8 +21,8 @@ int process_postings(void (*processor)(struct posting *posting, void *data), voi
 int decimal_mul(struct decimal *a, struct decimal *b, struct decimal *out);
 int decimal_add(struct decimal *a, struct decimal *b, struct decimal *out);
 int decimal_cmp(struct decimal *a, struct decimal *b);
-void decimal_abs(struct decimal *in, struct decimal *out);
-void decimal_print(struct decimal *val, int minplaces);
+int decimal_abs(struct decimal *in, struct decimal *out);
+int decimal_print(struct decimal *val, int minplaces);
 int tmcmp(const void *a, const void *b); // parameter should be a struct posting pointer
 int posting_dup(struct posting *dst, const struct posting *src);
 ssize_t decimal_parse(struct decimal *out, const char *buf, size_t len);

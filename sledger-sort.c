@@ -18,13 +18,27 @@ int flowcmp(const void *_a, const void *_b) {
 
 	struct decimal temp;
 	for (int i = 0; i < arrlen(a->lines); i++) {
-		decimal_abs(&a->lines[i].val, &temp);
-		decimal_add(&da, &temp, &da);
+		if (decimal_abs(&a->lines[i].val, &temp) != 0) {
+			fprintf(stderr, "decimal_abs: failure\n");
+			exit(1);
+		}
+
+		if (decimal_add(&da, &temp, &da) != 0) {
+			fprintf(stderr, "decimal_add: failure\n");
+			exit(1);
+		}
 	}
 
 	for (int i = 0; i < arrlen(b->lines); i++) {
-		decimal_abs(&b->lines[i].val, &temp);
-		decimal_add(&db, &temp, &db);
+		if (decimal_abs(&b->lines[i].val, &temp)) {
+			fprintf(stderr, "decimal_abs: failure\n");
+			exit(1);
+		}
+
+		if (decimal_add(&db, &temp, &db)) {
+			fprintf(stderr, "decimal_add: failure\n");
+			exit(1);
+		}
 	}
 
 	int ret = decimal_cmp(&da, &db);

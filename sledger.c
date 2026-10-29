@@ -84,13 +84,18 @@ decimal_add(struct decimal *_a, struct decimal *_b, struct decimal *out)
 	return 0;
 }
 
-void decimal_abs(struct decimal *in, struct decimal *out)
+int decimal_abs(struct decimal *in, struct decimal *out)
 {
 	*out = *in;
+
+	if (out->sig == LONG_MIN)
+		return -1;
 
 	if (out->sig < 0) {
 		out->sig = -out->sig;
 	}
+
+	return 0;
 }
 
 int decimal_cmp(struct decimal *_a, struct decimal *_b)
@@ -108,25 +113,25 @@ int decimal_cmp(struct decimal *_a, struct decimal *_b)
 	}
 
 	while (a.places < b.places) {
-		long new_sig = 10 * a.sig;
-		if (new_sig / 10 != a.sig) {
+		if (a.sig > LONG_MAX / 10 || a.sig < LONG_MIN / 10) {
 			return -2;
 		}
+		long new_sig = 10 * a.sig;
 		a.sig = new_sig;
 		a.places++;
 	}
 
-	long diff = (_a->places > _b->places) ? (b.sig - a.sig) : (a.sig - b.sig);
-	if (diff == 0) {
-		return 0;
-	} else if (diff > 0) {
-		return 1;
-	} else {
-		return -1;
+	int ret = 0;
+	if (a.sig < b.sig) {
+		ret = -1;
+	} else if (a.sig > b.sig) {
+		ret = 1;
 	}
+
+	return (_a->places > _b->places) ? -ret : ret;
 }
 
-void
+int
 decimal_print(struct decimal *val, int minplaces)
 {
 	assert(val->places <= 20);
@@ -138,6 +143,10 @@ decimal_print(struct decimal *val, int minplaces)
 	unsigned int places = val->places;
 
 	if (sig < 0) {
+		if (sig == LONG_MIN) {
+			return -1;
+		}
+
 		sig = -sig;
 		putchar('-');
 	}
@@ -163,6 +172,8 @@ decimal_print(struct decimal *val, int minplaces)
 	while (minplaces-- > 0) {
 		putchar('0');
 	}
+
+	return 0;
 }
 
 ssize_t decimal_parse(struct decimal *out, const char *buf, size_t len) {
@@ -183,11 +194,11 @@ ssize_t decimal_parse(struct decimal *out, const char *buf, size_t len) {
 		len--;
 	}
 
-	if (len == 0 || (!isdigit(*buf) && *buf != '.')) {
+	if (len == 0 || (!isdigit((unsigned char) *buf) && *buf != '.')) {
 		return -1;
 	}
 
-	while (len && (isdigit(*buf) || *buf == '.' || *buf == ',')) {
+	while (len && (isdigit((unsigned char) *buf) || *buf == '.' || *buf == ',')) {
 		if (*buf == ',') {
 			buf++;
 			len--;
@@ -207,14 +218,15 @@ ssize_t decimal_parse(struct decimal *out, const char *buf, size_t len) {
 		if (have_point)
 			out->places++;
 
-		long new_sig = 10 * out->sig;
-		if (new_sig / 10 != out->sig) {
+		if (out->sig > LONG_MAX / 10) {
 			return -2;
 		}
+		long new_sig = 10 * out->sig;
+
+		if (new_sig > LONG_MAX - (*buf - '0'))
+			return -3;
 
 		new_sig += *buf - '0';
-		if (new_sig < 0)
-			return -3;
 
 		out->sig = new_sig;
 		buf++;
@@ -237,7 +249,7 @@ static int
 eat_whitespace(char *buf, size_t len, size_t min)
 {
 	size_t startlen = len;
-	while (len && isspace(*buf)) {
+	while (len && isspace((unsigned char) *buf)) {
 		if (*buf == '\n') {
 			break;
 		}
@@ -290,14 +302,14 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	size_t account_len = 0;
 
 	// first character of account music be alphabetic, rest can be alphanumeric
-	if (len && isalpha(*buf)) {
+	if (len && isalpha((unsigned char) *buf)) {
 		account_len++;
 		buf++;
 		len--;
 		col++;
 	}
 
-	while (len && (isalnum(*buf) || *buf == ':' || *buf == '_')) {
+	while (len && (isalnum((unsigned char) *buf) || *buf == ':' || *buf == '_')) {
 		account_len++;
 		buf++;
 		len--;
@@ -313,7 +325,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	if (pl->account == NULL)
 		return -1;
 
-	if (!isspace(*buf)) {
+	if (!isspace((unsigned char) *buf)) {
 		fprintf(stderr, "%ld:%ld: expected whitespace after account name '%s'\n", line, col, pl->account);
 		goto err1;
 	}
@@ -376,11 +388,11 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 
 	char *currency = buf;
 	size_t currency_len = 0;
-	if (!isalpha(*buf)) {
+	if (!isalpha((unsigned char) *buf)) {
 		fprintf(stderr, "%ld:%ld: expected first character of currency to be a letter\n", line, col);
 		goto err1;
 	}
-	while (len && (isalnum(*buf) || *buf == '_')) {
+	while (len && (isalnum((unsigned char) *buf) || *buf == '_')) {
 		currency_len++;
 		buf++;
 		len--;
@@ -409,7 +421,7 @@ err1:
 
 bool isemptyline(char *lineptr, int n) {
 	for (int i = 0; i < n; i++) {
-		if (!isspace(lineptr[i]))
+		if (!isspace((unsigned char) lineptr[i]))
 			return false;
 	}
 
@@ -492,7 +504,7 @@ parse_posting(char *buf, size_t len, struct posting *p)
 
 	size_t n = 0;
 	while (1) {
-		char c;
+		int c;
 		if ((c = getc(stdin)) != EOF) {
 			ungetc(c, stdin);
 			if (!isspace(c)) {

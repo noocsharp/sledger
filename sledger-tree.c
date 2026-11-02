@@ -43,7 +43,11 @@ void add_account(struct account_tree **account_tree, char *account, struct decim
 			amount_for_currency = shgetp(parenttree->amount, currency_duped);
 		}
 
-		decimal_add(&amount_for_currency->value, &value, &amount_for_currency->value);
+		if (decimal_add(&amount_for_currency->value, &value, &amount_for_currency->value) != 0) {
+			fprintf(stderr, "decimal_add: failure\n");
+			exit(1);
+		}
+
 		curtree = &shget(*curtree, tok);
 	} while ((tok = strtok_r(NULL, ":", &saveptr)) != NULL);
 }

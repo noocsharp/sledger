@@ -174,6 +174,7 @@ void aggregate_processor(struct posting *posting, void *data) {
 			fprintf(stderr, "decimal_add: failure\n");
 			exit(1);
 		}
+
 		shput(currencymap, currency, val);
 		shput(accountmap, account, currencymap);
 	}

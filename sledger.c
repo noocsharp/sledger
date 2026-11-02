@@ -180,6 +180,9 @@ ssize_t decimal_parse(struct decimal *out, const char *buf, size_t len) {
 	bool have_point = false;
 	size_t startlen = len;
 
+	out->sig = 0;
+	out->places = 0;
+
 	bool neg = false;
 
 	if (len == 0)
@@ -240,9 +243,19 @@ ssize_t decimal_parse(struct decimal *out, const char *buf, size_t len) {
 int tmcmp(const void *_a, const void *_b) {
 	struct posting *a = (struct posting *) _a;
 	struct posting *b = (struct posting *) _b;
-	if (a->time.tm_year != b->time.tm_year) return a->time.tm_year - b->time.tm_year;
-	if (a->time.tm_mon != b->time.tm_mon) return a->time.tm_mon - b->time.tm_mon;
-	return a->time.tm_mday - b->time.tm_mday;
+	if (a->time.tm_year != b->time.tm_year) {
+		return a->time.tm_year < b->time.tm_year ? -1 : 1;
+	}
+
+	if (a->time.tm_mon != b->time.tm_mon) {
+		return a->time.tm_mon < b->time.tm_mon ? -1 : 1;
+	}
+
+	if (a->time.tm_mday != b->time.tm_mday) {
+		return a->time.tm_mday < b->time.tm_mday ? -1 : 1;
+	}
+
+	return 0;
 }
 
 static int
@@ -268,7 +281,7 @@ eat_whitespace(char *buf, size_t len, size_t min)
 void
 print_posting(struct posting *posting)
 {
-	printf("%04d-%02d-%02d %s\n", 1900 + posting->time.tm_year, posting->time.tm_mon + 1, posting->time.tm_mday, posting->desc);
+	printf("%04d-%02d-%02d %s\n", 1900 + posting->time.tm_year, posting->time.tm_mon + 1, posting->time.tm_mday, posting->desc ? posting->desc : NULL);
 
 	for (int j = 0; j < arrlen(posting->lines); j++) {
 		printf("\t%s ", posting->lines[j].account);
@@ -290,7 +303,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		return -1;
 
 	if (*buf != '\t') {
-		fprintf(stderr, "%ld:%ld: expected posting line to start with a tab\n", line, col);
+		fprintf(stderr, "%lu:%lu: expected posting line to start with a tab\n", line, col);
 		return -1;
 	}
 
@@ -317,7 +330,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	}
 
 	if (account_len == 0) {
-		fprintf(stderr, "%ld:%ld: expected account name on posting line\n", line, col);
+		fprintf(stderr, "%lu:%lu: expected account name on posting line\n", line, col);
 		return -1;
 	}
 
@@ -326,7 +339,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 		return -1;
 
 	if (!isspace((unsigned char) *buf)) {
-		fprintf(stderr, "%ld:%ld: expected whitespace after account name '%s'\n", line, col, pl->account);
+		fprintf(stderr, "%lu:%lu: expected whitespace after account name '%s'\n", line, col, pl->account);
 		goto err1;
 	}
 
@@ -355,10 +368,10 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	if (ret < 0) {
 		switch (ret) {
 		case -2:
-			fprintf(stderr, "%ld:%ld: invalid decimal: overflow\n", line, col);
+			fprintf(stderr, "%lu:%lu: invalid decimal: overflow\n", line, col);
 			break;
 		default:
-			fprintf(stderr, "%ld:%ld: invalid decimal\n", line, col);
+			fprintf(stderr, "%lu:%lu: invalid decimal\n", line, col);
 		}
 		goto err1;
 	}
@@ -368,7 +381,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	col += ret;
 
 	if (ret == 0) {
-		fprintf(stderr, "%ld:%ld: expected value after account name '%s'\n", line, col, pl->account);
+		fprintf(stderr, "%lu:%lu: expected value after account name '%s'\n", line, col, pl->account);
 		goto err1;
 	}
 
@@ -380,7 +393,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	col += ret;
 
 	if (len == 0) {
-		fprintf(stderr, "%ld:%ld: expected currency\n", line, col);
+		fprintf(stderr, "%lu:%lu: expected currency\n", line, col);
 		goto err1;
 	}
 
@@ -389,7 +402,7 @@ parse_posting_line(char *buf, size_t len, struct posting_line *pl)
 	char *currency = buf;
 	size_t currency_len = 0;
 	if (!isalpha((unsigned char) *buf)) {
-		fprintf(stderr, "%ld:%ld: expected first character of currency to be a letter\n", line, col);
+		fprintf(stderr, "%lu:%lu: expected first character of currency to be a letter\n", line, col);
 		goto err1;
 	}
 	while (len && (isalnum((unsigned char) *buf) || *buf == '_')) {
@@ -455,13 +468,13 @@ parse_posting(char *buf, size_t len, struct posting *p)
 {
 	char *lineptr = NULL;
 	if (len < strlen("0000-00-00")) {
-		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
+		fprintf(stderr, "%lu:%lu: invalid date\n", line, col);
 		goto err;
 	}
 
 	char *dateend = strptime(buf, "%Y-%m-%d", &p->time);
 	if (dateend == NULL) {
-		fprintf(stderr, "%ld:%ld: invalid date\n", line, col);
+		fprintf(stderr, "%lu:%lu: invalid date\n", line, col);
 		goto err;
 	}
 
@@ -471,7 +484,7 @@ parse_posting(char *buf, size_t len, struct posting *p)
 
 	int ret = eat_whitespace(buf, len, 1);
 	if (ret == -1) {
-		fprintf(stderr, "%ld:%ld: expected description for posting\n", line, col);
+		fprintf(stderr, "%lu:%lu: expected description for posting\n", line, col);
 		goto err;
 	}
 
@@ -482,13 +495,13 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	char *nl = memchr(buf, '\n', len);
 	if (nl == NULL) {
 		col += len;
-		fprintf(stderr, "%ld:%ld: expected newline after posting description\n", line, col);
+		fprintf(stderr, "%lu:%lu: expected newline after posting description\n", line, col);
 		goto err;
 	}
 
 	p->desc = strndup(buf, nl - buf);
 	if (p->desc == NULL) {
-		fprintf(stderr, "%ld:%ld: strndup failed\n", line, col);
+		fprintf(stderr, "%lu:%lu: strndup failed\n", line, col);
 		goto err;
 	}
 
@@ -529,13 +542,13 @@ parse_posting(char *buf, size_t len, struct posting *p)
 			if (line_without_value_index == -1) {
 				line_without_value_index = arrlen(p->lines);
 			} else {
-				fprintf(stderr, "%ld:%ld: cannot have more than two lines in a posting without values\n", line, col);
+				fprintf(stderr, "%lu:%lu: cannot have more than two lines in a posting without values\n", line, col);
 				goto err;
 			}
 		}
 
 		if (decimal_add(&total, &pl.val, &total) == -1) {
-			fprintf(stderr, "%ld:%ld: decimal_add overflow\n", line, col);
+			fprintf(stderr, "%lu:%lu: decimal_add overflow\n", line, col);
 			goto err;
 		}
 
@@ -553,18 +566,23 @@ parse_posting(char *buf, size_t len, struct posting *p)
 	}
 
 	if (read == -1 && !feof(stdin)) {
-		fprintf(stderr, "%ld:%ld: getline read failed\n", line, col);
+		fprintf(stderr, "%lu:%lu: getline read failed\n", line, col);
 		goto err;
 	}
 
 	if (arrlen(p->lines) < 2) {
-		fprintf(stderr, "%ld:%ld: expected at least 2 posting lines after posting description\n", line, col);
+		fprintf(stderr, "%lu:%lu: expected at least 2 posting lines after posting description\n", line, col);
 		goto err;
 	}
 
 	if (line_without_value_index != -1) {
 		if (multicurrency) {
-			fprintf(stderr, "%ld:%ld: cannot infer value in transaction with different currencies\n", line, col);
+			fprintf(stderr, "%lu:%lu: cannot infer value in transaction with different currencies\n", line, col);
+			goto err;
+		}
+
+		if (total.sig == LONG_MIN) {
+			fprintf(stderr, "%lu:%lu: total == LONG_MIN\n", line, col);
 			goto err;
 		}
 
@@ -574,13 +592,13 @@ parse_posting(char *buf, size_t len, struct posting *p)
 		assert(currency);
 		char *duped_currency = strdup(currency);
 		if (duped_currency == NULL) {
-			fprintf(stderr, "%ld:%ld: strdup failed\n", line, col);
+			fprintf(stderr, "%lu:%lu: strdup failed\n", line, col);
 			goto err;
 		}
 		p->lines[line_without_value_index].currency = duped_currency;
 	} else if (!multicurrency) {
 		if (sl_balance_transactions && total.sig != 0) {
-			fprintf(stderr, "%ld:%ld: transaction does not balance\n", line, col);
+			fprintf(stderr, "%lu:%lu: transaction does not balance\n", line, col);
 			goto err;
 		}
 	}
@@ -639,10 +657,15 @@ error:
 }
 
 int posting_dup(struct posting *dst, const struct posting *src) {
+	if (src->desc == NULL)
+		return -1;
+
 	dst->time = src->time;
 	dst->desc = strdup(src->desc);
 	if (dst->desc == NULL)
 		goto err;
+
+	dst->lines = NULL;
 
 	for (int i = 0; i < arrlen(src->lines); i++) {
 		struct posting_line new_line = src->lines[i];
